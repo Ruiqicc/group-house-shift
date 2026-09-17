@@ -73,6 +73,13 @@ button{font:inherit;color:inherit}
 .gauge .top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
 .gauge .v{font-family:var(--mono);font-size:12px;font-weight:600}
 
+.shiftbadge{font-family:var(--label);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  font-weight:700;border:1px solid var(--rule-hard);padding:2px 8px;color:var(--ink-2);white-space:nowrap}
+.shifthours{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+body.eve .shiftbadge{border-color:var(--haze);color:var(--haze)}
+body.eve .clockbar{border-color:var(--haze)}
+body.eve .plan{border-color:var(--haze)}
+.partnerline{font-size:11.5px;color:var(--ink-3);padding:0 12px 10px;margin-top:-4px}
 .hazebar{margin-top:8px;border:1px solid var(--haze);background:var(--card);color:var(--haze);
   padding:7px 12px;display:flex;gap:10px;align-items:center;font-size:13px}
 .hazebar b{font-family:var(--label);letter-spacing:.1em;text-transform:uppercase;font-size:11px}
@@ -199,7 +206,9 @@ body.hazy .plan, body.hazy .acts{filter:saturate(.55) contrast(.93)}
   <div class="clockbar">
     <div class="stamp">
       <span class="day lbl" id="dayLbl">第 1 天 · 周一</span>
+      <span class="shiftbadge" id="shiftBadge">白班</span>
       <span class="time num" id="clock">07:00</span>
+      <span class="shifthours" id="shiftHours">07:00–15:00</span>
     </div>
     <div class="ticks" id="ticks"></div>
     <div class="gauges">
@@ -241,6 +250,7 @@ body.hazy .plan, body.hazy .acts{filter:saturate(.55) contrast(.93)}
       <section class="panel" style="margin-top:16px">
         <h2><span>关系</span><span>他们看到的不是你做了什么</span></h2>
         <div class="favors" id="favors"></div>
+        <div class="partnerline" id="partnerLine"></div>
       </section>
 
       <section class="panel" style="margin-top:16px">
@@ -273,74 +283,167 @@ var ROOMS = [
   {id:'bath',   en:'Bathroom',  cn:'卫生间', cls:'a-bath'}
 ];
 var DAYNAMES = ['周一','周二','周三','周四','周五'];
-var SLOTS = 48;                     // 07:00 – 15:00，每格 10 分钟
-var BREAKFAST_BY = 18, LUNCH_FROM = 24, LUNCH_BY = 36;
+var SLOTS = 48;                       // 一班 8 小时，每格 10 分钟
+
+var SHIFTS = {
+  day:{ id:'day', cn:'白班', hours:'07:00–15:00', startMin:7*60, partner:'凯莎',
+        next:'晚班', need4:'activity',
+        meals:[{key:'breakfast',cn:'早饭',from:0,by:18,prep:2},
+               {key:'lunch',    cn:'午饭',from:24,by:36,prep:3}] },
+  eve:{ id:'eve', cn:'晚班', hours:'15:00–23:00', startMin:15*60, partner:'托尼',
+        next:'夜班', need4:'hygiene',
+        meals:[{key:'dinner',  cn:'晚饭',from:6, by:21,prep:3}] }
+};
+var SCHEDULE = ['day','day','eve','eve','day'];   // 周一 … 周五
+var BEDTIME_FROM = 30;                            // 晚班 20:00 之后才好哄睡
+var SUNDOWN_FROM = 15;                            // 晚班 17:30 起「落日综合征」
 
 function clock(sl){
-  var m = 7*60 + sl*10;
-  return String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0');
+  var m = S.startMin + sl*10;
+  return String(Math.floor(m/60)%24).padStart(2,'0') + ':' + String(m%60).padStart(2,'0');
 }
+function SH(){ return SHIFTS[S.shift]; }
+function isDay(){ return S.shift==='day'; }
 
 /* ============ 状态 ============ */
 var S;
-function newResidents(){
-  return [
-    {id:'danny', name:'丹尼', init:'D', room:'bed1', at:'bed1',
-     sub:'41岁 · 2型糖尿病 · 从不主动说要上厕所',
-     needs:{toilet:20,hunger:55,mood:30,activity:40},
-     rate:{toilet:2.1,hunger:1.7,mood:1.3,activity:1.1},
-     isp:'走廊步行 10 分钟 + 自己整理床铺',
-     medWin:[6,16], medDone:false, medGiven:false, bmDays:1, up:false, ispDone:false},
-    {id:'rosa', name:'罗莎', init:'R', room:'bed2', at:'bed2',
-     sub:'63岁 · 轮椅 · 便秘史 · 怕吵',
-     needs:{toilet:30,hunger:45,mood:25,activity:30},
-     rate:{toilet:1.7,hunger:1.6,mood:1.5,activity:1.3},
-     isp:'拼图或听书 15 分钟，记录参与度',
-     medWin:[12,24], medDone:false, medGiven:false, bmDays:2, up:false, ispDone:false}
-  ];
+function newResidents(sid){
+  var day = sid==='day';
+  var d = {id:'danny', name:'丹尼', init:'D', room:'bed1', at: day?'bed1':'living',
+    sub:'41岁 · 2型糖尿病 · 从不主动说要上厕所',
+    isp:'走廊步行 10 分钟 + 自己整理床铺',
+    medDone:false, medGiven:false, bmDays:1,
+    up:day?false:true, ispDone:false, showered:false, inBed:false};
+  var r = {id:'rosa', name:'罗莎', init:'R', room:'bed2', at: day?'bed2':'living',
+    sub:'63岁 · 轮椅 · 便秘史 · 怕吵',
+    isp:'拼图或听书 15 分钟，记录参与度',
+    medDone:false, medGiven:false, bmDays:2,
+    up:day?false:true, ispDone:false, showered:false, inBed:false};
+  if(day){
+    d.needs={toilet:20,hunger:55,mood:30,activity:40};
+    d.rate ={toilet:2.1,hunger:1.7,mood:1.3,activity:1.1};
+    d.medWin=[6,16];
+    r.needs={toilet:30,hunger:45,mood:25,activity:30};
+    r.rate ={toilet:1.7,hunger:1.6,mood:1.5,activity:1.3};
+    r.medWin=[12,24];
+  } else {
+    d.needs={toilet:30,hunger:50,mood:35,hygiene:70};
+    d.rate ={toilet:2.1,hunger:1.8,mood:1.4,hygiene:0.5};
+    d.medWin=[6,18];
+    r.needs={toilet:35,hunger:45,mood:30,hygiene:75};
+    r.rate ={toilet:1.7,hunger:1.7,mood:1.5,hygiene:0.5};
+    r.medWin=[14,28];
+  }
+  return [d,r];
 }
+
 function newDay(day, carry){
-  var res = newResidents();
-  if(carry && carry.bm){ res[0].bmDays = carry.bm.danny; res[1].bmDays = carry.bm.rosa; }
+  var sid = SCHEDULE[(day-1)%SCHEDULE.length];
+  var sh = SHIFTS[sid];
+  var mess = carry && carry.mess;
+  var res = newResidents(sid);
+  if(carry && carry.bm){ res[0].bmDays=carry.bm.danny; res[1].bmDays=carry.bm.rosa; }
+  var rooms = {living:{clean:72},kitchen:{clean:66},bath:{clean:55},bed1:{clean:70},bed2:{clean:70}};
+  if(mess){
+    ['living','kitchen','bath','bed1','bed2'].forEach(function(k){
+      rooms[k].clean = clamp(mess.rooms[k]*0.55 + 30, 12, 92);   // 别的班也擦，但擦不完
+    });
+  }
   return {
-    day:day, slot:0, over:false,
+    day:day, shift:sid, startMin:sh.startMin, partner:sh.partner, need4:sh.need4,
+    slot:0, over:false,
     energy: carry ? carry.energy : 100,
     wage: carry ? carry.wage : 16.5,
     favorCo: carry ? carry.favorCo : 50,
     favorBoss: carry ? carry.favorBoss : 50,
-    residents:res,
-    rooms:{living:{clean:72},kitchen:{clean:66},bath:{clean:55},bed1:{clean:70},bed2:{clean:70}},
-    kitchen:{menuRead:false, prepped:false, dishes:0, breakfast:false, lunch:false, coffee:0},
-    laundry:{state:'idle', readyAt:0, dirty:3, collected:0},
-    here:'living', pending:[], written:0, log:[], incidents:0,
+    residents: res,
+    rooms: rooms,
+    kitchen:{menuRead:false, prepped:false, dishes: mess?mess.dishes:0, served:{}, coffee:0},
+    laundry:{state:'idle', readyAt:0, dirty: mess?mess.dirty:3, collected:0},
+    here:'living', pending:[], written:0, log:[], incidents:0, rounds:0,
     events:[], evtCooldown:2, haze:false, rested:0,
-    tally:{careDone:0, docMissed:0},
+    handoffDone:false, promised:false, laundryDone:false, helped:0,
     weekly: carry ? carry.weekly : {days:[]}
   };
 }
 
 /* ============ 工具 ============ */
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 function say(txt, kind){
   S.log.push({t:clock(S.slot), x:txt, k:kind||''});
-  if(S.log.length>120) S.log.shift();
+  if(S.log.length>140) S.log.shift();
 }
 var toastT;
 function toast(msg){
   var el=$('toast'); el.textContent=msg; el.classList.add('on');
-  clearTimeout(toastT); toastT=setTimeout(function(){ el.classList.remove('on'); }, 2100);
+  clearTimeout(toastT); toastT=setTimeout(function(){ el.classList.remove('on'); }, 2200);
 }
-function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 function R(rid){ return S.residents.filter(function(r){return r.id===rid;})[0]; }
+function needKeys(){ return ['toilet','hunger','mood', S.need4]; }
 function favor(who, d, why){
   if(who==='co'){ S.favorCo = clamp(S.favorCo+d,0,100); }
   else { S.favorBoss = clamp(S.favorBoss+d,0,100); }
-  if(why) say((who==='co'?'凯莎':'琳达')+' '+(d>0?'+':'')+d+'　'+why, d>0?'good':'bad');
+  if(why) say((who==='co'?S.partner:'琳达')+' '+(d>0?'+':'')+d+'　'+why, d>0?'good':'bad');
 }
-function chart(text){ S.pending.push({t:clock(S.slot), x:text}); S.tally.careDone++; }
+function chart(text){ S.pending.push({t:clock(S.slot), x:text}); }
 function incident(text){
   S.incidents++; say('【事件】'+text,'bad');
   S.pending.push({t:clock(S.slot), x:'事件报告：'+text});
   favor('boss',-9,'房子里出了事');
+}
+function nextMeal(){
+  var ms = SH().meals;
+  for(var i=0;i<ms.length;i++){ if(!S.kitchen.served[ms[i].key]) return ms[i]; }
+  return null;
+}
+
+/* ============ 同事：随机替你解决问题 ============ */
+function coworkerTick(){
+  if(S.over) return;
+  var P = S.partner;
+  // 关系太差：他反过来给你添活
+  if(S.favorCo < 28 && Math.random() < 0.010){
+    if(Math.random()<0.5){
+      S.kitchen.dishes += 2;
+      say(P+'把他那摊碗留在水槽里就走了。','bad');
+    } else {
+      var rk = ['living','kitchen','bath'][Math.floor(Math.random()*3)];
+      S.rooms[rk].clean = clamp(S.rooms[rk].clean-18,0,100);
+      say(P+'说他腰不好，那块地他不拖了。','bad');
+    }
+    return;
+  }
+  var p = 0.020 + (S.favorCo/100)*0.060;      // 好感 50 ≈ 每班 2~3 次
+  if(Math.random() > p) return;
+
+  var opts = [];
+  if(S.kitchen.dishes>0) opts.push(function(){
+    S.kitchen.dishes=0; say(P+'顺手把碗洗了。','good'); });
+  if(S.laundry.state==='washed') opts.push(function(){
+    S.laundry.state='drying'; S.laundry.readyAt=S.slot+5; say(P+'把洗好的衣服转进烘干机了。','good'); });
+  if(S.laundry.dirty>0 && S.laundry.collected===0) opts.push(function(){
+    S.laundry.collected+=S.laundry.dirty; S.laundry.dirty=0; say(P+'把脏衣服收出来了。','good'); });
+  var dirtyRoom = null;
+  ROOMS.forEach(function(rm){ if(S.rooms[rm.id].clean<50 && !dirtyRoom) dirtyRoom=rm; });
+  if(dirtyRoom) opts.push(function(){
+    S.rooms[dirtyRoom.id].clean=clamp(S.rooms[dirtyRoom.id].clean+34,0,100);
+    say(P+'把'+dirtyRoom.cn+'拖了一遍。','good'); });
+  var upset = S.residents.filter(function(r){ return r.needs.mood>70; })[0];
+  if(upset) opts.push(function(){
+    upset.needs.mood=clamp(upset.needs.mood-48,0,100);
+    say(P+'把'+upset.name+'哄住了。','good'); });
+  var bursting = S.residents.filter(function(r){ return r.needs.toilet>82; })[0];
+  if(bursting) opts.push(function(){
+    bursting.needs.toilet=clamp(bursting.needs.toilet-85,0,100);
+    chart(bursting.name+'：协助如厕（由'+P+'完成）');
+    say(P+'帮你带'+bursting.name+'去了卫生间——「你记一下啊」','good'); });
+  var nm = nextMeal();
+  if(nm && !S.kitchen.prepped && S.slot>=nm.from-4) opts.push(function(){
+    S.kitchen.prepped=true; say(P+'先把'+nm.cn+'的菜备上了。','good'); });
+
+  if(!opts.length) return;
+  opts[Math.floor(Math.random()*opts.length)]();
+  S.helped++;
 }
 
 /* ============ 时间推进 ============ */
@@ -349,57 +452,59 @@ function advance(n){
     S.slot++;
     S.energy = clamp(S.energy - 0.35, 0, 100);
     S.residents.forEach(function(r){
-      for(var k in r.rate){ r.needs[k] = clamp(r.needs[k] + r.rate[k], 0, 100); }
+      for(var k in r.rate){
+        var inc = r.rate[k];
+        if(k==='mood' && !isDay() && S.slot>=SUNDOWN_FROM) inc *= (r.id==='danny'?2.4:1.6);
+        if(r.inBed) inc *= (k==='toilet' ? 0.5 : 0.25);
+        r.needs[k] = clamp(r.needs[k] + inc, 0, 100);
+      }
       if(r.needs.toilet>=100){
         r.needs.toilet = 12;
-        incident(r.name+'没忍住，尿湿了裤子和沙发');
+        incident(r.name+'没忍住，尿湿了裤子'+(r.inBed?'和床单':'和沙发'));
         S.rooms[r.at].clean = clamp(S.rooms[r.at].clean-30,0,100);
         S.laundry.dirty += 2;
+        if(r.inBed){ r.inBed=false; r.at=r.room; }
       }
       if(r.needs.mood>=100){
         r.needs.mood = 55;
-        incident(r.name+'情绪爆发，摔了东西');
+        incident(r.name+(isDay()?'情绪爆发，摔了东西':'天黑以后情绪失控，在走廊喊人'));
+        if(r.inBed){ r.inBed=false; r.at='living'; }
       }
     });
-    ['living','kitchen','bath','bed1','bed2'].forEach(function(k){
-      S.rooms[k].clean = clamp(S.rooms[k].clean-0.45,0,100);
+    ROOMS.forEach(function(rm){
+      S.rooms[rm.id].clean = clamp(S.rooms[rm.id].clean-0.45,0,100);
     });
     if(S.laundry.state==='washing' && S.slot>=S.laundry.readyAt){ S.laundry.state='washed'; say('洗衣机停了。','note'); }
-    if(S.laundry.state==='drying' && S.slot>=S.laundry.readyAt){ S.laundry.state='dried'; say('烘干机停了。','note'); }
-    if(S.slot===BREAKFAST_BY && !S.kitchen.breakfast){
-      say('十点了，早饭还没上桌。','bad'); favor('boss',-5,'早餐超时');
-      S.residents.forEach(function(r){ r.needs.hunger=clamp(r.needs.hunger+12,0,100); });
-    }
-    if(S.slot===LUNCH_BY && !S.kitchen.lunch){
-      say('一点了，午饭没赶上点。','bad'); favor('boss',-5,'午餐超时');
-      S.residents.forEach(function(r){ r.needs.hunger=clamp(r.needs.hunger+14,0,100); });
-    }
-    S.residents.forEach(function(r){
-      if(!r.medDone && S.slot===r.medWin[1]+1){
-        incident(r.name+'的药过了给药时间窗');
-        r.medDone = true;
+    if(S.laundry.state==='drying'  && S.slot>=S.laundry.readyAt){ S.laundry.state='dried';  say('烘干机停了。','note'); }
+    SH().meals.forEach(function(m){
+      if(S.slot===m.by && !S.kitchen.served[m.key]){
+        say(m.cn+'没赶上点。','bad'); favor('boss',-5,m.cn+'超时');
+        S.residents.forEach(function(r){ r.needs.hunger=clamp(r.needs.hunger+13,0,100); });
       }
     });
+    S.residents.forEach(function(r){
+      if(!r.medDone && S.slot===r.medWin[1]+1){ incident(r.name+'的药过了给药时间窗'); r.medDone=true; }
+    });
+    coworkerTick();
   }
   S.haze = S.energy < 35;
   document.body.classList.toggle('hazy', S.haze);
   if(S.slot>=SLOTS && !S.over){ S.over=true; }
 }
 
-/* ============ 动作 ============ */
+/* ============ 动作表 ============ */
 function A(id,room,title,desc,slots,eng,avail,run,prio){
   return {id:id,room:room,title:title,desc:desc,slots:slots,eng:eng,avail:avail,run:run,prio:prio};
 }
-function needBar(r,k){ return r.needs[k]; }
 
 function buildActions(){
-  var L=[], here=S.here;
+  var L=[], here=S.here, day=isDay();
 
   /* —— 客厅 —— */
-  L.push(A('chart','living','写记录本','把做过的事补进 charting binder（一次最多 4 条）',1,2,
+  L.push(A('chart','living','写记录本','把做过的事补进 charting binder（一次最多 5 条）',1,2,
     function(){ return S.pending.length>0 ? true : '没有待记录的事'; },
     function(){
-      var n = Math.min(4, S.pending.length);
+      var n = Math.min(5, S.pending.length);
       for(var i=0;i<n;i++){ var p=S.pending.shift(); S.written++; say('已记录：'+p.x,'good'); }
       if(S.pending.length===0) favor('boss',3,'记录本是干净的');
     }, function(){ return S.pending.length>=6; }));
@@ -413,73 +518,78 @@ function buildActions(){
     function(){ S.rooms.living.clean=clamp(S.rooms.living.clean+38,0,100); }));
 
   S.residents.forEach(function(r){
-    if(r.at==='living') L.push(A('comfort_'+r.id,'living','陪 '+r.name+' 坐一会儿','听他说话，把电视换到他要的台',2,4,
+    if(r.at==='living') L.push(A('comfort_'+r.id,'living','陪 '+r.name+' 坐一会儿',
+      day?'听他说话，把电视换到他要的台':'天黑了，把灯打开、声音放小',2,4,
       function(){ return r.needs.mood>20 ? true : r.name+'现在挺好'; },
       function(){ r.needs.mood=clamp(r.needs.mood-55,0,100); chart(r.name+'：情绪支持，无异常行为');
-        if(r.id==='rosa') favor('co',2,'罗莎心情好，晚班省事'); },
+        if(r.id==='rosa') favor('co',2,'罗莎心情好，下一班省事'); },
       function(){ return r.needs.mood>70; }));
 
-    L.push(A('isp_'+r.id,'living','带 '+r.name+' 做 ISP 目标','「'+r.isp+'」—— 白班唯一要交数据的项目',2,6,
+    if(day) L.push(A('isp_'+r.id,'living','带 '+r.name+' 做 ISP 目标','「'+r.isp+'」—— 白班唯一要交数据的项目',2,6,
+      function(){ return r.ispDone ? '今天的目标已完成' : (r.up ? true : r.name+'还没起床'); },
       function(){
-        if(r.ispDone) return '今天的目标已完成';
-        return r.up ? true : r.name+'还没起床';
-      },
-      function(){
-        r.ispDone=true;
+        r.ispDone=true; r.at='living';
         r.needs.activity=clamp(r.needs.activity-75,0,100);
         r.needs.mood=clamp(r.needs.mood-20,0,100);
-        r.at='living';
         chart('ISP 数据 · '+r.name+' · '+r.isp+' · 参与度：主动');
         favor('boss',5,'ISP 数据有人填');
-      },
-      function(){ return !r.ispDone && S.slot>30; }));
+      }, function(){ return !r.ispDone && S.slot>30; }));
   });
 
-  L.push(A('handoff','living','写交班笔记','告诉晚班：谁拉了、谁没拉、谁今晚该洗澡、洗衣机里有什么',2,4,
-    function(){ return S.slot>=40 ? true : '还早，两点以后再写'; },
+  if(!day) L.push(A('rounds','living','夜间查房','挨个卧室推门看一眼，呼吸、体位、有没有掉下床',1,2,
     function(){
-      var honest = S.pending.length<=2;
-      if(honest){ favor('co',16,'交班笔记写得清楚'); }
+      if(!S.residents.every(function(r){return r.inBed;})) return '得等两个人都睡下';
+      if(S.rounds>=3) return '查得够勤了';
+      return true;
+    },
+    function(){ S.rounds++; chart('夜间查房 · '+clock(S.slot)+' · 两位居民呼吸平稳、无异常'); },
+    function(){ return S.residents.every(function(r){return r.inBed;}) && S.rounds<2 && S.slot>38; }));
+
+  L.push(A('handoff','living','写交班笔记',
+    day?'告诉晚班：谁拉了、谁没拉、谁今晚该洗澡、洗衣机里有什么'
+       :'告诉夜班：谁几点睡的、查房记录、谁的药明早要改',2,4,
+    function(){ return S.slot>=40 ? true : '还早，最后一小时再写'; },
+    function(){
+      if(S.pending.length<=2){ favor('co',16,'交班笔记写得清楚'); }
       else { favor('co',6,'笔记写了，但有些事你自己也说不清'); }
       S.handoffDone=true;
     }, function(){ return S.slot>=44; }));
 
   /* —— 厨房 —— */
+  var nm = nextMeal();
   L.push(A('menu','kitchen','看今日菜单','冰箱上那张塑封表，写着谁不能吃什么',1,2,
-    function(){ return !S.kitchen.menuRead ? true : '已经看过这一餐的菜单'; },
+    function(){ return !S.kitchen.menuRead ? (nm?true:'今天的饭都开完了') : '已经看过这一餐的菜单'; },
     function(){ S.kitchen.menuRead=true; say('菜单：今日软食；丹尼无糖、罗莎切碎。','note'); }));
 
-  L.push(A('prep','kitchen','备菜','洗切配，按限制单分盘', S.kitchen.breakfast?3:2, 6,
-    function(){ return !S.kitchen.prepped ? true : '菜已经备好了'; },
+  L.push(A('prep','kitchen', nm?('备'+nm.cn):'备菜','洗切配，按限制单分盘', nm?nm.prep:2, 6,
+    function(){ if(!nm) return '今天的饭都开完了'; return !S.kitchen.prepped ? true : '菜已经备好了'; },
     function(){ S.kitchen.prepped=true; }));
 
-  L.push(A('serve','kitchen','开饭','端上桌，看着他们吃完',2,5,
+  L.push(A('serve','kitchen', nm?('开'+nm.cn):'开饭','端上桌，看着他们吃完',2,5,
     function(){
+      if(!nm) return '今天的饭都开完了';
       if(!S.kitchen.prepped) return '还没备菜';
-      if(!S.kitchen.breakfast) return true;
-      if(S.kitchen.lunch) return '今天两顿都开过了';
-      return S.slot>=LUNCH_FROM ? true : '午饭还太早（11:00 以后）';
+      return S.slot>=nm.from ? true : '还太早（'+clock(nm.from)+' 以后）';
     },
     function(){
-      var meal = S.kitchen.breakfast ? '午饭' : '早饭';
       if(!S.kitchen.menuRead && Math.random()<0.55){
         incident('给丹尼上了含糖果汁——没核对饮食限制单');
       }
       S.residents.forEach(function(r){
         r.needs.hunger=clamp(r.needs.hunger-80,0,100);
-        r.at='living';
-        chart(r.name+'：'+meal+'进食良好，按限制单供餐');
+        if(!r.inBed) r.at='living';
+        chart(r.name+'：'+nm.cn+'进食良好，按限制单供餐');
       });
-      if(S.kitchen.breakfast) S.kitchen.lunch=true; else S.kitchen.breakfast=true;
+      S.kitchen.served[nm.key]=true;
       S.kitchen.prepped=false; S.kitchen.menuRead=false; S.kitchen.dishes+=2;
-      favor('boss',4,meal+'准点');
-    }, function(){ return (!S.kitchen.breakfast && S.slot>=12) || (S.kitchen.breakfast && !S.kitchen.lunch && S.slot>=30); }));
+      favor('boss',4,nm.cn+'准点');
+    }, function(){ return nm && S.slot>=nm.by-8; }));
 
-  L.push(A('dishes','kitchen','洗碗','水槽里那摞，留给晚班就是结仇',2,4,
+  L.push(A('dishes','kitchen','洗碗','水槽里那摞，留给下一班就是结仇',2,4,
     function(){ return S.kitchen.dishes>0 ? true : '水槽是空的'; },
     function(){ S.kitchen.dishes=0; favor('co',6,'水槽是空的'); }));
 
-  L.push(A('coffee','kitchen','倒杯咖啡','壶底那点，早就不烫了',1,0,
+  L.push(A('coffee','kitchen','倒杯咖啡', day?'壶底那点，早就不烫了':'半夜的咖啡，喝了也未必醒',1,0,
     function(){ return S.kitchen.coffee<3 ? true : '再喝手要抖了'; },
     function(){
       S.kitchen.coffee++;
@@ -491,13 +601,14 @@ function buildActions(){
   S.residents.forEach(function(r){
     L.push(A('med_'+r.id,'kitchen','给 '+r.name+' 发药','打开药柜，对姓名、对剂量、看着他咽下去',1,2,
       function(){
-        if(r.medGiven) return '今天的药发过了';
-        if(r.medDone) return '已经错过窗口';
+        if(r.medGiven) return '这一班的药发过了';
+        if(r.medDone)  return '已经错过窗口';
         if(S.slot < r.medWin[0]) return '还没到给药窗口（'+clock(r.medWin[0])+'）';
         if(S.slot > r.medWin[1]) return '已经错过窗口';
         return true;
       },
-      function(){ r.medDone=true; r.medGiven=true; chart(r.name+'：按医嘱给药，'+clock(S.slot)+'，本人服下'); favor('boss',6,'给药准时'); },
+      function(){ r.medDone=true; r.medGiven=true;
+        chart(r.name+'：按医嘱给药，'+clock(S.slot)+'，本人服下'); favor('boss',6,'给药准时'); },
       function(){ return !r.medGiven && S.slot>=r.medWin[0] && S.slot>r.medWin[1]-6; }));
   });
 
@@ -511,7 +622,7 @@ function buildActions(){
       function(){ return r.needs.toilet>18 ? true : r.name+'刚去过'; },
       function(){
         r.needs.toilet=clamp(r.needs.toilet-85,0,100);
-        r.at='bath';
+        r.at='bath'; if(r.inBed) r.inBed=false;
         var chance = 0.28 + r.bmDays*0.16;
         if(Math.random()<chance){
           var type = 3 + Math.floor(Math.random()*3);
@@ -522,6 +633,16 @@ function buildActions(){
           chart(r.name+'：协助如厕，仅小便');
         }
       }, function(){ return r.needs.toilet>72; }));
+
+    if(!day) L.push(A('shower_'+r.id,'bath','协助 '+r.name+' 洗澡','水温、防滑垫、全程不能离开——晚班的活',3,8,
+      function(){ return r.showered ? '今晚洗过了' : true; },
+      function(){
+        r.showered=true; r.at='bath';
+        r.needs.hygiene=clamp(r.needs.hygiene-85,0,100);
+        r.needs.mood=clamp(r.needs.mood-18,0,100);
+        S.laundry.dirty+=2;
+        chart(r.name+'：协助淋浴，全程陪同，皮肤检查无破损');
+      }, function(){ return !r.showered && S.slot>26; }));
   });
 
   L.push(A('cleanBath','bath','打扫卫生间','地面积水是最常见的跌倒原因',2,6,
@@ -542,13 +663,32 @@ function buildActions(){
   /* —— 卧室 —— */
   ['bed1','bed2'].forEach(function(bid){
     var r = S.residents.filter(function(x){return x.room===bid;})[0];
-    L.push(A('wake_'+r.id,bid,'协助 '+r.name+' 起床更衣','扶起、换衣、穿鞋',2,6,
-      function(){ return !r.up ? true : r.name+'已经起来了'; },
-      function(){ r.up=true; r.at='living'; chart(r.name+'：晨间协助起床、更衣，配合度良好');
-        r.needs.mood=clamp(r.needs.mood-15,0,100); }, function(){ return !r.up && S.slot<12; }));
 
-    L.push(A('bedmake_'+bid,bid,'整理床铺','',1,3,
-      function(){ return S.rooms[bid].clean<85 ? true : '已经很整齐了'; },
+    if(day) L.push(A('wake_'+r.id,bid,'协助 '+r.name+' 起床更衣','扶起、换衣、穿鞋',2,6,
+      function(){ return !r.up ? true : r.name+'已经起来了'; },
+      function(){ r.up=true; r.at='living';
+        chart(r.name+'：晨间协助起床、更衣，配合度良好');
+        r.needs.mood=clamp(r.needs.mood-15,0,100); },
+      function(){ return !r.up && S.slot<12; }));
+
+    if(!day) L.push(A('bedtime_'+r.id,bid,'哄 '+r.name+' 睡下','换睡衣、刷牙、上床、留一盏小灯',2,6,
+      function(){
+        if(r.inBed) return r.name+'已经睡下了';
+        if(!r.showered) return '得先洗澡';
+        if(S.slot<BEDTIME_FROM) return '太早了（'+clock(BEDTIME_FROM)+' 以后）';
+        return true;
+      },
+      function(){
+        r.inBed=true; r.at=bid;
+        r.needs.mood=clamp(r.needs.mood-40,0,100);
+        chart(r.name+'：睡前护理完成，'+clock(S.slot)+' 上床，入睡平稳');
+      }, function(){ return !r.inBed && r.showered && S.slot>=BEDTIME_FROM; }));
+
+    L.push(A('bedmake_'+bid,bid, day?'整理床铺':'换床单铺床','',1,3,
+      function(){
+        if(r.inBed) return r.name+'在床上'; 
+        return S.rooms[bid].clean<85 ? true : '已经很整齐了';
+      },
       function(){ S.rooms[bid].clean=clamp(S.rooms[bid].clean+32,0,100); }));
 
     L.push(A('collect_'+bid,bid,'收脏衣服','床脚那一堆',1,2,
@@ -565,23 +705,25 @@ function buildActions(){
 
 /* ============ 随机事件 ============ */
 var EVENTS = [
-  {id:'remote', when:function(){return R('danny').at==='living';}, title:'遥控器不见了',
+  {id:'remote', when:function(){return isDay() && R('danny').at==='living';}, title:'遥控器不见了',
    text:'丹尼把遥控器扔到了沙发后面，现在冲着电视喊。他不会告诉你他扔了。',
    ch:[
     {t:'蹲下去把它抠出来', d:'−1 格 · 精力 −5 · 丹尼平静', f:function(){ advance(1); S.energy-=5; R('danny').needs.mood=10; chart('丹尼：行为激动，重定向后平复'); }},
     {t:'先忙完手上的事', d:'情绪继续涨，可能升级', f:function(){ R('danny').needs.mood=clamp(R('danny').needs.mood+30,0,100); }}
    ]},
-  {id:'keisha', when:function(){return true;}, title:'凯莎发消息',
-   text:'「能帮我顶十五分钟吗？我得给我儿子学校回个电话。」',
+  {id:'partner_ask', when:function(){return true;}, title:function(){return S.partner+'找你';},
+   text:function(){ return isDay()
+     ? '「能帮我顶十五分钟吗？我得给我儿子学校回个电话。」'
+     : '「我去后院抽根烟，十分钟。楼上你先盯着行吗？」'; },
    ch:[
-    {t:'顶', d:'−1 格 · 精力 −7 · 凯莎 +14', f:function(){ advance(1); S.energy-=7; favor('co',14,'你替她顶了班'); }},
-    {t:'今天真的不行', d:'凯莎 −9', f:function(){ favor('co',-9,'你没接她的班'); }}
+    {t:'行', d:'−1 格 · 精力 −7 · 同事 +14', f:function(){ advance(1); S.energy-=7; favor('co',14,'你替他顶了一会儿'); }},
+    {t:'今天真的不行', d:'同事 −9', f:function(){ favor('co',-9,'你没接他的班'); }}
    ]},
   {id:'boss_call', when:function(){return true;}, title:'琳达打电话进来',
    text:'「昨天的 BM chart 有一栏是空的。你们那班是没人拉屎，还是没人写？」',
    ch:[
-    {t:'承认漏记了', d:'琳达 −4，但她记住了你说实话', f:function(){ favor('boss',-4,'你承认漏记'); S.honest=true; }},
-    {t:'说今天一定补齐', d:'下班时若还有待记录 → 琳达 −16', f:function(){ S.promised=true; say('你答应琳达今天记录不留尾巴。','note'); }}
+    {t:'承认漏记了', d:'琳达 −4，但她记住了你说实话', f:function(){ favor('boss',-4,'你承认漏记'); }},
+    {t:'说今天一定补齐', d:'下班时若还有待记录 → 琳达 −12', f:function(){ S.promised=true; say('你答应琳达今天记录不留尾巴。','note'); }}
    ]},
   {id:'rosa_belly', when:function(){return R('rosa').bmDays>=2;}, title:'罗莎说肚子胀',
    text:'「我肚子不舒服。」她已经两天没有排便记录了。',
@@ -595,7 +737,7 @@ var EVENTS = [
     {t:'马上拖干净', d:'−1 格 · 精力 −4', f:function(){ advance(1); S.energy-=4; S.rooms.bath.clean=clamp(S.rooms.bath.clean+20,0,100); }},
     {t:'等下一起打扫', d:'有几率发生跌倒', f:function(){ if(Math.random()<0.45){ incident('罗莎在卫生间滑倒，需填 incident report 并通知家属'); } }}
    ]},
-  {id:'family', when:function(){return true;}, title:'家属来访',
+  {id:'family', when:function(){return isDay();}, title:'家属来访',
    text:'丹尼的姐姐站在门口：「他今天中午吃的什么？血糖测了吗？」',
    ch:[
     {t:'翻记录本，照着念', d:'需要记录本干净 · 琳达 +8 / −8', f:function(){
@@ -606,18 +748,41 @@ var EVENTS = [
    text:'滚筒停在半路，门锁着，里面是罗莎的床单。',
    ch:[
     {t:'断电重启', d:'−1 格', f:function(){ advance(1); S.laundry.readyAt=S.slot+3; }},
-    {t:'留给晚班处理', d:'凯莎 −10', f:function(){ favor('co',-10,'你把坏机器留给了晚班'); }}
+    {t:'留给下一班处理', d:'同事 −10', f:function(){ favor('co',-10,'你把坏机器留给了下一班'); }}
+   ]},
+  /* —— 晚班专属 —— */
+  {id:'sundown', when:function(){return !isDay() && S.slot>=SUNDOWN_FROM;}, title:'天黑了',
+   text:'丹尼站在窗边，说要回家。他在这儿住了十一年。',
+   ch:[
+    {t:'顺着他说，陪他走一圈', d:'−2 格 · 精力 −6 · 情绪清零', f:function(){ advance(2); S.energy-=6; R('danny').needs.mood=5; chart('丹尼：日落期定向障碍，陪同散步后平复，未使用 PRN'); }},
+    {t:'告诉他这儿就是他家', d:'情绪 +35，他会更急', f:function(){ R('danny').needs.mood=clamp(R('danny').needs.mood+35,0,100); say('他不信，开始拍门。','bad'); }},
+    {t:'问'+'搭班的人能不能接手', d:'同事 −6，但你省下时间', f:function(){ R('danny').needs.mood=clamp(R('danny').needs.mood-45,0,100); favor('co',-6,'你把难缠的活推给了他'); }}
+   ]},
+  {id:'callout', when:function(){return !isDay() && S.slot>=10;}, title:'夜班有人请假',
+   text:'调度打来：夜班的人发烧了，问你能不能留下顶到凌晨三点。',
+   ch:[
+    {t:'留下', d:'琳达 +14 · 明天起始精力 −25', f:function(){ favor('boss',14,'你顶了夜班的缺'); S.stayedLate=true; }},
+    {t:'我明天还有早班', d:'琳达 −6', f:function(){ favor('boss',-6,'你拒绝了加班'); }}
+   ]},
+  {id:'nightnoise', when:function(){return !isDay() && S.residents.some(function(r){return r.inBed;});}, title:'卧室有动静',
+   text:'罗莎房里传来响动。可能是她想下床。',
+   ch:[
+    {t:'立刻过去看', d:'−1 格 · 精力 −3', f:function(){ advance(1); S.energy-=3; chart('罗莎：夜间起身，已协助并确认安全'); }},
+    {t:'再听一会儿', d:'有几率跌倒', f:function(){ if(Math.random()<0.4){ incident('罗莎夜间自行下床，跌倒在床边'); R('rosa').inBed=false; } }}
    ]}
 ];
+function evTitle(e){ return typeof e.title==='function' ? e.title() : e.title; }
+function evText(e){ return typeof e.text==='function' ? e.text() : e.text; }
+
 function maybeEvent(){
   if(S.over) return false;
   if(S.evtCooldown>0){ S.evtCooldown--; return false; }
-  if(S.slot<3 || S.slot>29) return false;
-  if(Math.random()>0.34) return false;
+  if(S.slot<4 || S.slot>44) return false;
+  if(Math.random()>0.32) return false;
   var pool = EVENTS.filter(function(e){ return S.events.indexOf(e.id)<0 && e.when(); });
   if(!pool.length) return false;
   var e = pool[Math.floor(Math.random()*pool.length)];
-  S.events.push(e.id); S.evtCooldown=3;
+  S.events.push(e.id); S.evtCooldown=4;
   showEvent(e);
   return true;
 }
@@ -644,12 +809,17 @@ function perform(list, idx){
   advance(slots);
   render();
   if(!S.over) maybeEvent();
-  if(S.over) endDay();
+  if(S.over) endShift();
 }
 
 /* ============ 渲染 ============ */
+var NEEDLBL={toilet:'如厕',hunger:'饥饿',mood:'情绪',activity:'活动',hygiene:'清洁'};
+
 function render(){
-  $('dayLbl').textContent = '第 '+S.day+' 天 · '+DAYNAMES[S.day-1];
+  document.body.classList.toggle('eve', !isDay());
+  $('dayLbl').textContent = '第 '+S.day+' 天 · '+DAYNAMES[(S.day-1)%5];
+  $('shiftBadge').textContent = SH().cn;
+  $('shiftHours').textContent = SH().hours;
   $('clock').textContent = clock(Math.min(S.slot,SLOTS));
   $('engV').textContent = Math.round(S.energy);
   var ef=$('engF'); ef.style.width=S.energy+'%';
@@ -659,32 +829,43 @@ function render(){
   $('docF').style.width = (total? (S.written/total*100):0)+'%';
   $('hazebar').hidden = !S.haze;
 
+  var mealSlots = SH().meals.map(function(m){ return m.by; });
   var tk=''; for(var i=0;i<SLOTS;i++){
     var c='tick'+(i<S.slot?' past':'')+(i===S.slot?' now':'');
-    if(i===BREAKFAST_BY||i===LUNCH_BY) c+=' meal';
+    if(mealSlots.indexOf(i)>=0) c+=' meal';
     tk+='<div class="'+c+'"></div>';
   }
   $('ticks').innerHTML=tk;
 
-  // floor plan
+  /* 平面图 */
   var plan='';
   ROOMS.forEach(function(rm){
     var people = S.residents.filter(function(r){return r.at===rm.id;});
-    var flags=[];
-    var clean=S.rooms[rm.id].clean;
+    var flags=[], clean=S.rooms[rm.id].clean;
     if(clean<40) flags.push('<span class="flag red">脏</span>');
     else if(clean<65) flags.push('<span class="flag amber">该擦了</span>');
     if(rm.id==='kitchen'){
       if(S.kitchen.dishes>0) flags.push('<span class="flag amber">水槽</span>');
-      S.residents.forEach(function(r){ if(!r.medDone && S.slot>=r.medWin[0]&&S.slot<=r.medWin[1]) flags.push('<span class="flag red">'+r.name+'的药</span>'); });
-      if(!S.kitchen.breakfast) flags.push('<span class="flag blue">早饭</span>');
-      else if(!S.kitchen.lunch && S.slot>=LUNCH_FROM) flags.push('<span class="flag blue">午饭</span>');
+      S.residents.forEach(function(r){
+        if(!r.medGiven && !r.medDone && S.slot>=r.medWin[0] && S.slot<=r.medWin[1])
+          flags.push('<span class="flag red">'+r.name+'的药</span>');
+      });
+      var nmf = nextMeal();
+      if(nmf && S.slot>=nmf.from-6) flags.push('<span class="flag blue">'+nmf.cn+'</span>');
     }
     if(rm.id==='bath'){
       if(S.laundry.state==='washed') flags.push('<span class="flag blue">该烘了</span>');
       if(S.laundry.state==='dried') flags.push('<span class="flag blue">该叠了</span>');
+      if(!isDay()) S.residents.forEach(function(r){
+        if(!r.showered) flags.push('<span class="flag amber">'+r.name+'要洗澡</span>');
+      });
     }
     if(rm.id==='living' && S.pending.length>=5) flags.push('<span class="flag red">'+S.pending.length+' 条待记</span>');
+    if(!isDay() && (rm.id==='bed1'||rm.id==='bed2')){
+      var rr = S.residents.filter(function(x){return x.room===rm.id;})[0];
+      if(rr.inBed) flags.push('<span class="flag blue">已睡下</span>');
+      else if(rr.showered && S.slot>=BEDTIME_FROM) flags.push('<span class="flag amber">该睡了</span>');
+    }
     plan += '<button class="room '+rm.cls+'" data-room="'+rm.id+'" aria-pressed="'+(S.here===rm.id)+'">'
       + '<div class="rname">'+rm.en+'</div><div class="rcn">'+rm.cn+'</div>'
       + '<div class="flags">'+flags.join('')+'</div>'
@@ -698,15 +879,14 @@ function render(){
     b.addEventListener('click', function(){ S.here=b.dataset.room; render(); });
   });
 
-  // actions
+  /* 动作 */
   var list = buildActions();
   var rmObj = ROOMS.filter(function(r){return r.id===S.here;})[0];
   $('actHead').textContent = rmObj.cn+' · 可做的事';
-  $('actSub').textContent = '剩 '+(SLOTS-S.slot)+' 格 / '+clock(SLOTS);
+  $('actSub').textContent = '剩 '+(SLOTS-S.slot)+' 格 / 下班 '+SH().hours.split('–')[1];
   var html='';
   list.forEach(function(a,i){
-    var av = a.avail(), ok = av===true;
-    var prio = ok && a.prio && a.prio();
+    var av=a.avail(), ok=av===true, prio=ok&&a.prio&&a.prio();
     var cost = (a.eng<0? '精力 +'+(-a.eng) : '精力 −'+a.eng);
     html += '<button class="act'+(prio?' prio':'')+'" data-i="'+i+'"'+(ok?'':' disabled')+'>'
       + '<span><span class="t">'+a.title+'</span>'
@@ -718,28 +898,29 @@ function render(){
     b.addEventListener('click', function(){ perform(list, +b.dataset.i); });
   });
 
-  // residents
+  /* 居民 */
   var rh='';
-  var NEEDLBL={toilet:'如厕',hunger:'饥饿',mood:'情绪',activity:'活动'};
   S.residents.forEach(function(r){
     var needs='';
-    ['toilet','hunger','mood','activity'].forEach(function(k){
+    needKeys().forEach(function(k){
       var v=r.needs[k], cls = v>75?'nf b':(v>50?'nf w':'nf');
       needs += '<div class="need"><div class="nl">'+NEEDLBL[k]+'</div><div class="nb"><div class="'+cls+'" style="width:'+v+'%"></div></div></div>';
     });
     var due = r.bmDays>=3;
+    var second = isDay()
+      ? '<span>ISP</span><span>'+(r.ispDone?'✓ 今日数据已交':'未做')+'</span><span style="margin-left:auto">洗澡 / 睡前 → 晚班</span>'
+      : '<span>晚间</span><span>'+(r.showered?'✓ 已洗澡':'未洗澡')+' · '+(r.inBed?'已睡下':'未睡')+'</span><span style="margin-left:auto">ISP → 白班</span>';
     rh += '<div class="res"><div class="hd"><span class="nm">'+r.name+'</span>'
-      + '<span class="sub">'+(r.medDone?'药 ✓':'药 '+clock(r.medWin[0])+'–'+clock(r.medWin[1]))+'</span></div>'
+      + '<span class="sub">'+(r.medGiven?'药 ✓':(r.medDone?'药 ✗ 已错过':'药 '+clock(r.medWin[0])+'–'+clock(r.medWin[1])))+'</span></div>'
       + '<div class="sub">'+r.sub+'</div>'
       + '<div class="needs">'+needs+'</div>'
       + '<div class="bmline"><span>BM chart</span><span class="pill'+(due?' due':'')+'">'+r.bmDays+' 天未排便</span>'
       + (due?'<span style="color:var(--red)">需上报</span>':'')+'</div>'
-      + '<div class="bmline" style="opacity:.6"><span>ISP</span><span>'+(r.ispDone?'✓ 今日数据已交':'未做')+'</span>'
-      + '<span style="margin-left:auto">洗澡 / 睡前 → 晚班</span></div></div>';
+      + '<div class="bmline" style="opacity:.62">'+second+'</div></div>';
   });
   $('residents').innerHTML=rh;
 
-  // favors
+  /* 关系 */
   function favBlock(nm, role, v, why){
     var cls = v>=65?'fill good':(v<35?'fill bad':'fill');
     return '<div class="fav"><div class="top"><span class="nm">'+nm+'</span><span class="num" style="font-size:12px">'+Math.round(v)+'</span></div>'
@@ -747,19 +928,17 @@ function render(){
       + '<div class="why">'+why+'</div></div>';
   }
   $('favors').innerHTML =
-    favBlock('凯莎','同班同事', S.favorCo, '看你留没留活儿给她') +
+    favBlock(S.partner,'今天和你搭班', S.favorCo, '看你留没留活儿给他') +
     favBlock('琳达','House Manager', S.favorBoss, '只看得见记录和事件报告');
+  $('partnerLine').textContent = '班组口碑是一条：'+S.partner+'和凯莎、托尼私下都通气。关系越好，'+S.partner+'越会顺手替你解决事情（本班已帮 '+S.helped+' 次）。';
 
-  // pending
+  /* 待记录 */
   $('pendCount').textContent = S.pending.length+' 条';
-  if(!S.pending.length){ $('pending').innerHTML='<div class="empty">目前没有欠下的记录。做过的事只要没写进去，在琳达眼里就没发生过。</div>'; }
-  else {
-    $('pending').innerHTML = S.pending.map(function(p){
-      return '<div class="row"><span class="tm">'+p.t+'</span><span>'+p.x+'</span></div>';
-    }).join('');
-  }
+  $('pending').innerHTML = S.pending.length
+    ? S.pending.map(function(p){ return '<div class="row"><span class="tm">'+p.t+'</span><span>'+p.x+'</span></div>'; }).join('')
+    : '<div class="empty">目前没有欠下的记录。做过的事只要没写进去，在琳达眼里就没发生过。</div>';
 
-  // log
+  /* 流水 */
   $('log').innerHTML = S.log.slice(-40).map(function(l){
     return '<div class="l '+l.k+'"><span class="tm">'+l.t+'</span><span>'+l.x+'</span></div>';
   }).join('');
@@ -776,107 +955,130 @@ function showEvent(e){
   var ch = e.ch.map(function(c,i){
     return '<button class="choice" data-c="'+i+'"><div class="ct">'+c.t+'</div><div class="cd">'+c.d+'</div></button>';
   }).join('');
-  modal('<div class="mh"><span class="k">打断 · '+clock(S.slot)+'</span><span class="k">'+(SLOTS-S.slot)+' 格剩余</span></div>'
-    + '<div class="mb"><h3>'+e.title+'</h3><p>'+e.text+'</p><div class="choices">'+ch+'</div></div>');
+  modal('<div class="mh"><span class="k">打断 · '+clock(S.slot)+'</span><span class="k">'+SH().cn+' · '+(SLOTS-S.slot)+' 格剩余</span></div>'
+    + '<div class="mb"><h3>'+evTitle(e)+'</h3><p>'+evText(e)+'</p><div class="choices">'+ch+'</div></div>');
   Array.prototype.forEach.call(document.querySelectorAll('.choice'), function(b){
     b.addEventListener('click', function(){
-      closeModal(); say('【'+e.title+'】'+e.ch[+b.dataset.c].t,'note');
+      closeModal(); say('【'+evTitle(e)+'】'+e.ch[+b.dataset.c].t,'note');
       e.ch[+b.dataset.c].f(); S.energy=clamp(S.energy,0,100);
-      render(); if(S.over) endDay();
+      render(); if(S.over) endShift();
     });
   });
 }
 
-/* ============ 日终结算 ============ */
-function endDay(){
-  // 结算前的最后检查
+/* ============ 下班结算 ============ */
+function dutyList(){
+  var d=R('danny'), r=R('rosa');
+  if(isDay()) return [
+    ['丹尼起床', d.up], ['罗莎起床', r.up],
+    ['丹尼发药', d.medGiven], ['罗莎发药', r.medGiven],
+    ['早饭', !!S.kitchen.served.breakfast], ['午饭', !!S.kitchen.served.lunch],
+    ['洗碗', S.kitchen.dishes===0],
+    ['丹尼 ISP', d.ispDone], ['罗莎 ISP', r.ispDone],
+    ['洗衣归位', !!S.laundryDone]
+  ];
+  return [
+    ['丹尼洗澡', d.showered], ['罗莎洗澡', r.showered],
+    ['丹尼发药', d.medGiven], ['罗莎发药', r.medGiven],
+    ['晚饭', !!S.kitchen.served.dinner], ['洗碗', S.kitchen.dishes===0],
+    ['丹尼睡下', d.inBed], ['罗莎睡下', r.inBed],
+    ['夜间查房 ≥2', S.rounds>=2],
+    ['洗衣归位', !!S.laundryDone]
+  ];
+}
+
+function endShift(){
   if(!S.handoffDone){ favor('co',-10,'你没写交班笔记'); }
   if(S.promised && S.pending.length>0){ favor('boss',-12,'你答应琳达补齐记录，没做到'); }
   S.residents.forEach(function(r){ r.bmDays = r.bmDays + 1; });
+
   var totalCare = S.written + S.pending.length;
   var docRate = totalCare ? S.written/totalCare : 1;
   var avgNeed = 0, n=0;
-  S.residents.forEach(function(r){ ['toilet','hunger','mood','activity'].forEach(function(k){ avgNeed+=r.needs[k]; n++; }); });
+  S.residents.forEach(function(r){ needKeys().forEach(function(k){ avgNeed+=r.needs[k]; n++; }); });
   avgNeed/=n;
   var cleanAvg = (S.rooms.living.clean+S.rooms.kitchen.clean+S.rooms.bath.clean+S.rooms.bed1.clean+S.rooms.bed2.clean)/5;
-
-  // 白班本职清单：起床、发药、两顿饭、洗碗、ISP 数据、洗衣归位
-  var duties = [
-    R('danny').up, R('rosa').up,
-    R('danny').medGiven, R('rosa').medGiven,
-    S.kitchen.breakfast, S.kitchen.lunch, S.kitchen.dishes===0,
-    R('danny').ispDone, R('rosa').ispDone,
-    !!S.laundryDone
-  ];
-  var dutyDone = duties.filter(Boolean).length;
+  var duties = dutyList();
+  var dutyDone = duties.filter(function(x){return x[1];}).length;
   var dutyRate = dutyDone/duties.length;
 
-  var score = 0;
-  score += docRate*30;
-  score += dutyRate*22;
-  score += Math.max(0, 16 - S.incidents*5.5);
-  score += (S.favorBoss/100)*12;
-  score += (S.favorCo/100)*10;
-  score += Math.max(0,(100-avgNeed))/100*6;
-  score += cleanAvg/100*4;
+  var score = docRate*30 + dutyRate*22 + Math.max(0, 16 - S.incidents*5.5)
+            + (S.favorBoss/100)*12 + (S.favorCo/100)*10
+            + Math.max(0,(100-avgNeed))/100*6 + cleanAvg/100*4;
   var grade = score>=78?'A':score>=62?'B':score>=44?'C':'D';
 
-  S.weekly.days.push({day:S.day, score:score, grade:grade, doc:docRate, inc:S.incidents});
+  S.weekly.days.push({day:S.day, shift:S.shift, score:score, grade:grade, doc:docRate, inc:S.incidents});
 
+  var missed = duties.filter(function(x){return !x[1];}).map(function(x){return x[0];});
   var rows = [
     ['记录完整度', Math.round(docRate*100)+'%　('+S.written+'/'+totalCare+')'],
-    ['白班本职完成', dutyDone+'/'+duties.length],
+    [SH().cn+'本职完成', dutyDone+'/'+duties.length + (missed.length? '　漏：'+missed.slice(0,3).join('、')+(missed.length>3?'…':'') : '')],
     ['事件报告', S.incidents+' 起'],
+    [S.partner+' 替你解决', S.helped+' 次'],
     ['居民平均需求（越低越好）', Math.round(avgNeed)],
     ['房子整洁度', Math.round(cleanAvg)],
-    ['凯莎 / 琳达', Math.round(S.favorCo)+' / '+Math.round(S.favorBoss)],
+    [S.partner+' / 琳达', Math.round(S.favorCo)+' / '+Math.round(S.favorBoss)],
     ['下班剩余精力', Math.round(S.energy)]
   ].map(function(r){ return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td></tr>'; }).join('');
 
-  var verdict = {
+  var verdict = isDay() ? {
     A:'琳达在群里@了你一句「今天这班记录很干净」。',
     B:'没人找你麻烦。这在这行已经算不错了。',
-    C:'交班时凯莎看了你一眼，什么也没说。',
+    C:'交班时'+S.partner+'看了你一眼，什么也没说。',
     D:'你回到车里坐了十分钟才想起来发动。'
+  }[grade] : {
+    A:'两个人都睡了，厨房是干的，查房记录满的。你关灯的时候楼里很安静。',
+    B:'十一点，夜班来了。她翻了翻你的本子，说「行」。',
+    C:'你交班的时候没敢提水槽里那摞碗。',
+    D:'走出门的时候天已经全黑了，你不太记得这八个小时都干了什么。'
   }[grade];
 
   var isLast = S.day>=5;
-  modal('<div class="mh"><span class="k">下班打卡 · 15:00</span><span class="k">第 '+S.day+' 天</span></div>'
+  var nextShift = isLast ? null : SHIFTS[SCHEDULE[S.day % SCHEDULE.length]];
+  modal('<div class="mh"><span class="k">下班打卡 · '+SH().hours.split('–')[1]+'</span><span class="k">第 '+S.day+' 天 · '+SH().cn+'</span></div>'
     + '<div class="mb"><div style="display:flex;gap:18px;align-items:flex-start">'
     + '<div><div class="grade" style="color:'+(grade==='D'?'var(--red)':grade==='A'?'var(--green)':'var(--ink)')+'">'+grade+'</div>'
-    + '<div class="lbl" style="margin-top:4px">日评</div></div>'
+    + '<div class="lbl" style="margin-top:4px">班评</div></div>'
     + '<div style="flex:1"><h3 style="margin-top:0">'+verdict+'</h3>'
     + '<table class="scoretable">'+rows+'</table></div></div>'
-    + '<div style="display:flex;gap:8px"><button class="btn" id="nextBtn">'+(isLast?'看周结算':'打卡上班 · 第 '+(S.day+1)+' 天')+'</button></div></div>');
+    + '<div style="display:flex;gap:8px"><button class="btn" id="nextBtn">'
+    + (isLast?'看周结算':'打卡上班 · 第 '+(S.day+1)+' 天 '+nextShift.cn)+'</button></div></div>');
 
   $('nextBtn').addEventListener('click', function(){
     closeModal();
     if(isLast){ weekEnd(); return; }
+    var base = 70 + S.energy*0.30 - S.incidents*4 - (S.stayedLate?22:0);
     var carry = {
-      energy: clamp(58 + S.energy*0.42 - S.incidents*5, 30, 100),
+      energy: clamp(base, 42, 100),
       wage:S.wage, favorCo:S.favorCo, favorBoss:S.favorBoss, weekly:S.weekly,
-      bm:{danny:R('danny').bmDays, rosa:R('rosa').bmDays}
+      bm:{danny:R('danny').bmDays, rosa:R('rosa').bmDays},
+      mess:{ dishes:S.kitchen.dishes, dirty:S.laundry.dirty + (S.laundry.state!=='idle'?2:0),
+             rooms:{living:S.rooms.living.clean,kitchen:S.rooms.kitchen.clean,bath:S.rooms.bath.clean,
+                    bed1:S.rooms.bed1.clean,bed2:S.rooms.bed2.clean} }
     };
+    var prevShift = S.shift;
     S = newDay(S.day+1, carry);
-    say('打卡上班。','note');
+    say('打卡上班。上一班留下的：水槽 '+S.kitchen.dishes+' 摞，脏衣篮 '+S.laundry.dirty+' 袋。','note');
     render();
+    if(S.shift!==prevShift) shiftBrief();
   });
 }
 
 function weekEnd(){
-  var avg = S.weekly.days.reduce(function(a,b){return a+b.score;},0)/S.weekly.days.length;
-  var inc = S.weekly.days.reduce(function(a,b){return a+b.inc;},0);
-  var doc = S.weekly.days.reduce(function(a,b){return a+b.doc;},0)/S.weekly.days.length;
-  var raise = (avg>=70 && inc<=3 && S.favorBoss>=55);
+  var ds = S.weekly.days;
+  var avg = ds.reduce(function(a,b){return a+b.score;},0)/ds.length;
+  var inc = ds.reduce(function(a,b){return a+b.inc;},0);
+  var doc = ds.reduce(function(a,b){return a+b.doc;},0)/ds.length;
+  var raise = (avg>=66 && inc<=4 && S.favorBoss>=52);
   var newWage = raise ? S.wage+1.25 : S.wage;
-  var rows = S.weekly.days.map(function(d){
-    return '<tr><td>'+DAYNAMES[d.day-1]+'</td><td>'+d.grade+'　记录 '+Math.round(d.doc*100)+'%　事件 '+d.inc+'</td></tr>';
+  var rows = ds.map(function(d){
+    return '<tr><td>'+DAYNAMES[(d.day-1)%5]+'　'+SHIFTS[d.shift].cn+'</td><td>'+d.grade+'　记录 '+Math.round(d.doc*100)+'%　事件 '+d.inc+'</td></tr>';
   }).join('');
   modal('<div class="mh"><span class="k">90 天试用期 · 第一周复核</span><span class="k">Linda M., House Manager</span></div>'
     + '<div class="mb"><h3>'+(raise?'转正加薪：$'+S.wage.toFixed(2)+' → $'+newWage.toFixed(2)+'/小时'
         :'试用期延长。时薪维持 $'+S.wage.toFixed(2)+'。')+'</h3>'
     + '<p>'+(raise
-        ? '「记录能查、事件不多、晚班没抱怨。下周开始你带新人。」'
+        ? '「白班晚班都轮过了，记录能查，事件不多，两头交班都没人抱怨。下周开始你带新人。」'
         : '「不是说你不用心。是我只能看见纸上写了什么。」')+'</p>'
     + '<table class="scoretable">'+rows
     + '<tr><td>周均记录完整度</td><td>'+Math.round(doc*100)+'%</td></tr>'
@@ -890,24 +1092,42 @@ function weekEnd(){
   });
 }
 
-/* ============ 开场 ============ */
+/* ============ 简报 ============ */
 function intro(){
   modal('<div class="mh"><span class="k">上岗通知单</span><span class="k">Direct Support Professional</span></div>'
-    + '<div class="mb"><h3>第一天，白班 7:00–15:00</h3>'
-    + '<p>两位居民，五个房间，八小时切成 48 个格子，一格十分钟。活永远比格子多——这是设计，不是失误。你要决定的是谁可以等。</p>'
-    + '<p><b>白班管什么：</b>起床更衣、发药、早饭午饭、洗碗、打扫、洗衣、全天的如厕协助，以及 ISP 目标活动的数据。<br>'
-    + '<b>白班不管什么：</b>洗澡、睡前护理、夜间查房——那是晚班的事。你要做的是别把烂摊子留给他们。</p>'
+    + '<div class="mb"><h3>第一周排班：白 · 白 · 晚 · 晚 · 白</h3>'
+    + '<p>两位居民，五个房间。每班八小时，切成 48 个格子，一格十分钟。活永远比格子多——这是设计，不是失误。你要决定的是谁可以等。</p>'
+    + '<p><b>白班 07:00–15:00</b>　起床更衣、发药、早饭午饭、洗碗、打扫、洗衣、如厕协助，以及 ISP 目标活动的数据。<br>'
+    + '<b>晚班 15:00–23:00</b>　晚饭、洗澡、睡前护理、夜间查房。天黑以后丹尼会想回家。</p>'
     + '<p><b>三条规矩：</b><br>'
     + '① <b>做了不等于记了。</b>琳达看不见你做的事，只看得见记录本。<br>'
-    + '② <b>凯莎看的是你留没留活儿给她。</b>她和琳达的标准不一样，有时候冲突。<br>'
-    + '③ <b>精力低于 35 会开始恍惚。</b>点动作可能点错、耗时会变多。咖啡和坐下都能救，但都要花格子。</p>'
+    + '② <b>你留下的烂摊子会跟到下一班。</b>水槽里的碗、洗衣机里的湿衣服，第二天你自己或者别人要接着收。<br>'
+    + '③ <b>搭班的人会随手帮你。</b>关系越好帮得越多——但他帮你做的护理，记录还是你的。</p>'
     + '<div style="display:flex;gap:8px"><button class="btn" id="startBtn">打卡上班</button></div></div>');
   $('startBtn').addEventListener('click', function(){ closeModal(); });
 }
 
+function shiftBrief(){
+  if(isDay()){
+    modal('<div class="mh"><span class="k">换班次</span><span class="k">白班 07:00–15:00</span></div>'
+      + '<div class="mb"><h3>回到白班</h3>'
+      + '<p>今天搭班的是<b>凯莎</b>。白天的活是起床、发药、两顿饭、洗衣打扫，还有 ISP 目标数据——琳达月底查的就是那一栏。</p>'
+      + '<p>洗澡和睡前护理不归你。你能替晚班做的，是别把水槽和洗衣机留给他们。</p>'
+      + '<div style="display:flex;gap:8px"><button class="btn" id="briefBtn">知道了</button></div></div>');
+  } else {
+    modal('<div class="mh"><span class="k">换班次</span><span class="k">晚班 15:00–23:00</span></div>'
+      + '<div class="mb"><h3>第一次上晚班</h3>'
+      + '<p>今天搭班的是<b>托尼</b>。晚班的活不一样：一顿晚饭，<b>两个人的澡</b>，睡前护理，然后是夜间查房——两位都睡下之后，你得隔一阵进去看一眼。</p>'
+      + '<p><b>天黑以后情绪涨得快。</b>丹尼有日落期定向障碍，五点半以后会开始说要回家。哄住他要花时间，哄不住会变成事件报告。</p>'
+      + '<p>洗澡四格、睡前三格，两个人加起来就是十四格——晚班的时间比白班更不够用。托尼会帮忙，前提是他愿意帮你。</p>'
+      + '<div style="display:flex;gap:8px"><button class="btn" id="briefBtn">知道了</button></div></div>');
+  }
+  $('briefBtn').addEventListener('click', function(){ closeModal(); });
+}
+
 /* ============ 启动 ============ */
 function start(data){
-  if(data && data.S){ try{ S = data.S; }catch(e){ S = newDay(1,null); } }
+  if(data && data.S){ S = data.S; }
   else { S = newDay(1,null); say('打卡上班。','note'); }
   render();
   if(!data || !data.S) intro();
