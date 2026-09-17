@@ -1,0 +1,898 @@
+<title>白班 · 第一周</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --paper:#E9EBE3; --card:#F5F6F0; --card-2:#DFE3D9;
+  --ink:#181D19; --ink-2:#4E5750; --ink-3:#77817A;
+  --rule:#B4BBAE; --rule-hard:#8D968B;
+  --blue:#294A9C; --blue-soft:#DDE3F4;
+  --red:#A5311F; --red-soft:#F2DED9;
+  --amber:#8E6410; --amber-soft:#F0E4C9;
+  --green:#3B6B43; --green-soft:#DCE8DA;
+  --haze:#6A5388;
+  --shadow:0 1px 0 rgba(24,29,25,.14), 0 8px 22px -14px rgba(24,29,25,.5);
+  --label:'Archivo Narrow','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
+  --body:'IBM Plex Sans','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
+  --mono:'IBM Plex Mono','PingFang SC',ui-monospace,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#13171A; --card:#1B2124; --card-2:#252C2F;
+    --ink:#DFE4DD; --ink-2:#9CA69E; --ink-3:#77827A;
+    --rule:#333C3E; --rule-hard:#4A5457;
+    --blue:#93B0F7; --blue-soft:#20293C;
+    --red:#E9806F; --red-soft:#37211D;
+    --amber:#DCA847; --amber-soft:#332918;
+    --green:#83BC89; --green-soft:#1D2A20;
+    --haze:#AE96CE;
+    --shadow:0 1px 0 rgba(0,0,0,.4), 0 10px 26px -16px rgba(0,0,0,.9);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#13171A; --card:#1B2124; --card-2:#252C2F;
+  --ink:#DFE4DD; --ink-2:#9CA69E; --ink-3:#77827A;
+  --rule:#333C3E; --rule-hard:#4A5457;
+  --blue:#93B0F7; --blue-soft:#20293C;
+  --red:#E9806F; --red-soft:#37211D;
+  --amber:#DCA847; --amber-soft:#332918;
+  --green:#83BC89; --green-soft:#1D2A20;
+  --haze:#AE96CE;
+  --shadow:0 1px 0 rgba(0,0,0,.4), 0 10px 26px -16px rgba(0,0,0,.9);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.lbl{font-family:var(--label);text-transform:uppercase;letter-spacing:.10em;font-weight:700;font-size:11px;color:var(--ink-3)}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+.wrap{max-width:1180px;margin:0 auto;padding:18px 16px 40px}
+
+/* ---------- punch clock header ---------- */
+.clockbar{border:1px solid var(--rule-hard);background:var(--card);box-shadow:var(--shadow);
+  display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;padding:10px 14px}
+.stamp{display:flex;align-items:baseline;gap:10px}
+.stamp .day{font-family:var(--label);font-weight:700;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2)}
+.stamp .time{font-family:var(--mono);font-weight:600;font-size:30px;letter-spacing:-.02em;line-height:1}
+.ticks{display:flex;gap:2px;align-items:flex-end;height:26px}
+.tick{flex:1;min-width:2px;height:9px;background:var(--rule);border-radius:1px}
+.tick.past{background:var(--ink-2);height:16px}
+.tick.now{background:var(--blue);height:26px}
+.tick.meal{background:var(--amber);opacity:.55}
+.gauges{display:flex;gap:14px;align-items:center}
+.gauge{min-width:104px}
+.gauge .bar{height:7px;background:var(--card-2);border:1px solid var(--rule);margin-top:3px;position:relative}
+.gauge .fill{position:absolute;inset:0;right:auto;background:var(--green)}
+.gauge .fill.warn{background:var(--amber)} .gauge .fill.bad{background:var(--red)}
+.gauge .top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.gauge .v{font-family:var(--mono);font-size:12px;font-weight:600}
+
+.hazebar{margin-top:8px;border:1px solid var(--haze);background:var(--card);color:var(--haze);
+  padding:7px 12px;display:flex;gap:10px;align-items:center;font-size:13px}
+.hazebar b{font-family:var(--label);letter-spacing:.1em;text-transform:uppercase;font-size:11px}
+
+/* ---------- main layout ---------- */
+.board{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;margin-top:16px;align-items:start}
+@media (max-width:860px){ .board{grid-template-columns:1fr} }
+
+.panel{border:1px solid var(--rule-hard);background:var(--card);box-shadow:var(--shadow)}
+.panel > h2{margin:0;padding:8px 12px;border-bottom:1px solid var(--rule);
+  font-family:var(--label);text-transform:uppercase;letter-spacing:.12em;font-size:11px;font-weight:700;color:var(--ink-2);
+  display:flex;justify-content:space-between;gap:8px;align-items:center}
+.panel .body{padding:12px}
+
+/* floor plan */
+.plan{display:grid;grid-template-columns:1fr 1fr;grid-template-areas:"bed1 bed2" "living living" "kitchen bath";gap:0;
+  border:2px solid var(--ink-2);background:var(--card)}
+.room{position:relative;border:1px solid var(--rule-hard);background:transparent;cursor:pointer;text-align:left;
+  padding:9px 10px 30px;min-height:96px;display:block;transition:background .12s}
+.room:hover{background:var(--card-2)}
+.room[aria-pressed="true"]{background:var(--blue-soft);box-shadow:inset 0 0 0 2px var(--blue)}
+.room .rname{font-family:var(--label);text-transform:uppercase;letter-spacing:.1em;font-size:11px;font-weight:700;color:var(--ink-2)}
+.room .rcn{font-size:15px;font-weight:600;margin-top:1px}
+.room .people{position:absolute;left:10px;bottom:8px;display:flex;gap:4px}
+.room .flags{position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:3px;align-items:flex-end}
+.chip{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;
+  font-family:var(--mono);font-size:11px;font-weight:600;border:1px solid var(--ink-2);background:var(--card-2)}
+.chip.urgent{border-color:var(--red);color:var(--red);background:var(--red-soft)}
+.flag{font-family:var(--label);font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;
+  padding:1px 5px;border:1px solid currentColor}
+.flag.red{color:var(--red);background:var(--red-soft)}
+.flag.amber{color:var(--amber);background:var(--amber-soft)}
+.flag.blue{color:var(--blue);background:var(--blue-soft)}
+.plan .a-bed1{grid-area:bed1} .plan .a-bed2{grid-area:bed2}
+.plan .a-living{grid-area:living} .plan .a-kitchen{grid-area:kitchen} .plan .a-bath{grid-area:bath}
+
+/* action list */
+.acts{display:flex;flex-direction:column;gap:0}
+.act{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;width:100%;text-align:left;
+  background:transparent;border:0;border-bottom:1px dashed var(--rule);padding:9px 4px;cursor:pointer}
+.act:last-child{border-bottom:0}
+.act:hover:not(:disabled){background:var(--card-2)}
+.act:disabled{cursor:not-allowed;opacity:.42}
+.act .t{font-weight:500}
+.act .d{font-size:12px;color:var(--ink-3);margin-top:1px}
+.act .cost{font-family:var(--mono);font-size:11px;color:var(--ink-2);white-space:nowrap;text-align:right}
+.act .cost b{color:var(--blue);font-weight:600}
+.act.prio .t::after{content:"优先";font-family:var(--label);font-size:10px;letter-spacing:.08em;
+  margin-left:7px;padding:1px 4px;border:1px solid var(--red);color:var(--red);background:var(--red-soft)}
+
+/* resident cards */
+.res{border-bottom:1px solid var(--rule);padding:10px 12px}
+.res:last-child{border-bottom:0}
+.res .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.res .nm{font-weight:600;font-size:15px}
+.res .sub{font-size:12px;color:var(--ink-3)}
+.needs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+.need .nl{font-family:var(--label);font-size:10px;letter-spacing:.06em;color:var(--ink-3);text-transform:uppercase}
+.need .nb{height:6px;background:var(--card-2);border:1px solid var(--rule);margin-top:2px;position:relative}
+.need .nf{position:absolute;inset:0;right:auto;background:var(--ink-2)}
+.need .nf.w{background:var(--amber)} .need .nf.b{background:var(--red)}
+.bmline{margin-top:7px;font-family:var(--mono);font-size:11.5px;color:var(--ink-2);display:flex;gap:8px;align-items:center}
+.bmline .pill{border:1px solid var(--rule-hard);padding:0 5px}
+.bmline .pill.due{border-color:var(--red);color:var(--red);background:var(--red-soft)}
+
+/* favor */
+.favors{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px}
+.fav .top{display:flex;justify-content:space-between;align-items:baseline}
+.fav .nm{font-weight:600;font-size:13px}
+.fav .role{font-size:11.5px;color:var(--ink-3)}
+.fav .bar{height:7px;background:var(--card-2);border:1px solid var(--rule);margin-top:5px;position:relative}
+.fav .fill{position:absolute;inset:0;right:auto;background:var(--blue)}
+.fav .fill.bad{background:var(--red)} .fav .fill.good{background:var(--green)}
+.fav .why{font-size:11.5px;color:var(--ink-3);margin-top:4px}
+
+/* pending + log */
+.pend{padding:0 12px 12px}
+.pend .row{display:flex;gap:8px;align-items:baseline;font-family:var(--mono);font-size:12px;
+  padding:4px 0;border-bottom:1px dotted var(--rule)}
+.pend .row:last-child{border-bottom:0}
+.pend .row .tm{color:var(--ink-3)}
+.pend .empty{font-size:12.5px;color:var(--ink-3);padding:8px 0}
+.logbox{max-height:210px;overflow:auto;padding:0 12px 12px}
+.logbox .l{font-size:12.5px;padding:4px 0;border-bottom:1px dotted var(--rule);display:flex;gap:8px}
+.logbox .l:last-child{border-bottom:0}
+.logbox .tm{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);flex:0 0 42px}
+.logbox .l.bad{color:var(--red)} .logbox .l.good{color:var(--green)} .logbox .l.note{color:var(--ink-2)}
+
+/* modal */
+.scrim{position:fixed;inset:0;background:rgba(10,14,11,.55);display:grid;place-items:center;padding:16px;z-index:40}
+.modal{background:var(--card);border:1px solid var(--rule-hard);box-shadow:0 24px 60px -20px rgba(0,0,0,.6);
+  max-width:560px;width:100%;max-height:88vh;overflow:auto}
+.modal .mh{padding:12px 16px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.modal .mh .k{font-family:var(--label);text-transform:uppercase;letter-spacing:.12em;font-size:11px;font-weight:700;color:var(--ink-3)}
+.modal .mb{padding:16px}
+.modal h3{margin:0 0 8px;font-size:19px;font-weight:600;text-wrap:balance}
+.modal p{margin:0 0 12px;color:var(--ink-2);max-width:60ch}
+.choices{display:flex;flex-direction:column;gap:8px}
+.choice{text-align:left;background:transparent;border:1px solid var(--rule-hard);padding:10px 12px;cursor:pointer}
+.choice:hover{background:var(--card-2);border-color:var(--blue)}
+.choice .ct{font-weight:600}
+.choice .cd{font-size:12.5px;color:var(--ink-3);margin-top:2px}
+
+.scoretable{width:100%;border-collapse:collapse;margin:4px 0 14px;font-size:13px}
+.scoretable td{padding:6px 0;border-bottom:1px dotted var(--rule)}
+.scoretable td:last-child{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.grade{font-family:var(--label);font-size:52px;font-weight:700;line-height:.9;letter-spacing:-.02em}
+.btn{background:var(--blue);color:#fff;border:1px solid var(--blue);padding:9px 18px;cursor:pointer;
+  font-family:var(--label);text-transform:uppercase;letter-spacing:.1em;font-weight:700;font-size:12px}
+:root[data-theme="dark"] .btn, :root:not([data-theme="light"]) .btn{color:#11151A}
+@media (prefers-color-scheme: light){ :root:not([data-theme="dark"]) .btn{color:#fff} }
+.btn.ghost{background:transparent;color:var(--ink-2);border-color:var(--rule-hard)}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;z-index:60;
+  background:var(--ink);color:var(--paper);padding:8px 16px;font-size:13px;box-shadow:var(--shadow);
+  opacity:0;pointer-events:none;transition:opacity .18s}
+.toast.on{opacity:1}
+
+body.hazy .plan, body.hazy .acts{filter:saturate(.55) contrast(.93)}
+@media (prefers-reduced-motion: reduce){ *{transition:none !important} }
+</style>
+
+<div class="wrap">
+  <div class="clockbar">
+    <div class="stamp">
+      <span class="day lbl" id="dayLbl">第 1 天 · 周一</span>
+      <span class="time num" id="clock">07:00</span>
+    </div>
+    <div class="ticks" id="ticks"></div>
+    <div class="gauges">
+      <div class="gauge">
+        <div class="top"><span class="lbl">精力</span><span class="v" id="engV">100</span></div>
+        <div class="bar"><div class="fill" id="engF" style="width:100%"></div></div>
+      </div>
+      <div class="gauge">
+        <div class="top"><span class="lbl">时薪</span><span class="v" id="wageV">$16.50</span></div>
+        <div class="bar"><div class="fill" id="docF" style="width:0%;background:var(--blue)"></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="hazebar" id="hazebar" hidden>
+    <b>恍惚</b><span id="hazeTxt">视线开始发飘。点动作时有几率点错隔壁那条，耗时也可能多出一格。去客厅坐一下，或者倒杯咖啡。</span>
+  </div>
+
+  <div class="board">
+    <div>
+      <section class="panel">
+        <h2><span>Group House · 平面图</span><span id="planHint">点房间切换位置</span></h2>
+        <div class="body">
+          <div class="plan" id="plan"></div>
+        </div>
+      </section>
+
+      <section class="panel" style="margin-top:16px">
+        <h2><span id="actHead">客厅 · 可做的事</span><span id="actSub"></span></h2>
+        <div class="body"><div class="acts" id="acts"></div></div>
+      </section>
+    </div>
+
+    <div>
+      <section class="panel">
+        <h2><span>居民状态</span><span>needs / bm chart</span></h2>
+        <div id="residents"></div>
+      </section>
+
+      <section class="panel" style="margin-top:16px">
+        <h2><span>关系</span><span>他们看到的不是你做了什么</span></h2>
+        <div class="favors" id="favors"></div>
+      </section>
+
+      <section class="panel" style="margin-top:16px">
+        <h2><span>待记录</span><span id="pendCount">0 条</span></h2>
+        <div class="pend" id="pending"></div>
+      </section>
+
+      <section class="panel" style="margin-top:16px">
+        <h2><span>班次流水</span><span>shift log</span></h2>
+        <div class="logbox" id="log"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div id="modalHost"></div>
+
+<script>
+(function(){
+"use strict";
+var $ = function(id){ return document.getElementById(id); };
+
+/* ============ 静态设定 ============ */
+var ROOMS = [
+  {id:'bed1',   en:'Bedroom 1', cn:'卧室 1', cls:'a-bed1'},
+  {id:'bed2',   en:'Bedroom 2', cn:'卧室 2', cls:'a-bed2'},
+  {id:'living', en:'Living Room', cn:'客厅', cls:'a-living'},
+  {id:'kitchen',en:'Kitchen',   cn:'厨房', cls:'a-kitchen'},
+  {id:'bath',   en:'Bathroom',  cn:'卫生间', cls:'a-bath'}
+];
+var DAYNAMES = ['周一','周二','周三','周四','周五'];
+var SLOTS = 32;                     // 07:00 – 15:00，每格 15 分钟
+var BREAKFAST_BY = 10, LUNCH_FROM = 16, LUNCH_BY = 24;
+
+function clock(sl){
+  var m = 7*60 + sl*15;
+  return String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0');
+}
+
+/* ============ 状态 ============ */
+var S;
+function newResidents(){
+  return [
+    {id:'danny', name:'丹尼', init:'D', room:'bed1', at:'bed1',
+     sub:'41岁 · 2型糖尿病 · 从不主动说要上厕所',
+     needs:{toilet:20,hunger:55,mood:30,hygiene:35},
+     rate:{toilet:5.0,hunger:3.2,mood:2.4,hygiene:1.3},
+     medWin:[4,10], medDone:false, bmDays:1, up:false, quiet:true},
+    {id:'rosa', name:'罗莎', init:'R', room:'bed2', at:'bed2',
+     sub:'63岁 · 轮椅 · 便秘史 · 怕吵',
+     needs:{toilet:30,hunger:45,mood:25,hygiene:60},
+     rate:{toilet:3.8,hunger:3.0,mood:2.8,hygiene:2.0},
+     medWin:[8,14], medDone:false, bmDays:2, up:false, quiet:false}
+  ];
+}
+function newDay(day, carry){
+  var res = newResidents();
+  if(carry && carry.bm){ res[0].bmDays = carry.bm.danny; res[1].bmDays = carry.bm.rosa; }
+  return {
+    day:day, slot:0, over:false,
+    energy: carry ? carry.energy : 100,
+    wage: carry ? carry.wage : 16.5,
+    favorCo: carry ? carry.favorCo : 50,
+    favorBoss: carry ? carry.favorBoss : 50,
+    residents:res,
+    rooms:{living:{clean:72},kitchen:{clean:66},bath:{clean:55},bed1:{clean:70},bed2:{clean:70}},
+    kitchen:{menuRead:false, prepped:false, dishes:0, breakfast:false, lunch:false, coffee:0},
+    laundry:{state:'idle', readyAt:0, dirty:0, collected:0},
+    here:'living', pending:[], written:0, log:[], incidents:0,
+    events:[], evtCooldown:2, haze:false, rested:0,
+    tally:{careDone:0, docMissed:0},
+    weekly: carry ? carry.weekly : {days:[]}
+  };
+}
+
+/* ============ 工具 ============ */
+function say(txt, kind){
+  S.log.push({t:clock(S.slot), x:txt, k:kind||''});
+  if(S.log.length>120) S.log.shift();
+}
+var toastT;
+function toast(msg){
+  var el=$('toast'); el.textContent=msg; el.classList.add('on');
+  clearTimeout(toastT); toastT=setTimeout(function(){ el.classList.remove('on'); }, 2100);
+}
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function R(rid){ return S.residents.filter(function(r){return r.id===rid;})[0]; }
+function favor(who, d, why){
+  if(who==='co'){ S.favorCo = clamp(S.favorCo+d,0,100); }
+  else { S.favorBoss = clamp(S.favorBoss+d,0,100); }
+  if(why) say((who==='co'?'凯莎':'琳达')+' '+(d>0?'+':'')+d+'　'+why, d>0?'good':'bad');
+}
+function chart(text){ S.pending.push({t:clock(S.slot), x:text}); S.tally.careDone++; }
+function incident(text){
+  S.incidents++; say('【事件】'+text,'bad');
+  S.pending.push({t:clock(S.slot), x:'事件报告：'+text});
+  favor('boss',-9,'房子里出了事');
+}
+
+/* ============ 时间推进 ============ */
+function advance(n){
+  for(var i=0;i<n && S.slot<SLOTS;i++){
+    S.slot++;
+    S.energy = clamp(S.energy - 0.5, 0, 100);
+    S.residents.forEach(function(r){
+      for(var k in r.rate){ r.needs[k] = clamp(r.needs[k] + r.rate[k], 0, 100); }
+      if(r.needs.toilet>=100){
+        r.needs.toilet = 12;
+        incident(r.name+'没忍住，尿湿了裤子和沙发');
+        S.rooms[r.at].clean = clamp(S.rooms[r.at].clean-30,0,100);
+        S.laundry.dirty += 2;
+      }
+      if(r.needs.mood>=100){
+        r.needs.mood = 55;
+        incident(r.name+'情绪爆发，摔了东西');
+      }
+    });
+    ['living','kitchen','bath','bed1','bed2'].forEach(function(k){
+      S.rooms[k].clean = clamp(S.rooms[k].clean-0.7,0,100);
+    });
+    if(S.laundry.state==='washing' && S.slot>=S.laundry.readyAt){ S.laundry.state='washed'; say('洗衣机停了。','note'); }
+    if(S.laundry.state==='drying' && S.slot>=S.laundry.readyAt){ S.laundry.state='dried'; say('烘干机停了。','note'); }
+    if(S.slot===BREAKFAST_BY && !S.kitchen.breakfast){
+      say('九点半了，早饭还没上桌。','bad'); favor('boss',-8,'早餐超时');
+      S.residents.forEach(function(r){ r.needs.hunger=clamp(r.needs.hunger+18,0,100); });
+    }
+    if(S.slot===LUNCH_BY && !S.kitchen.lunch){
+      say('午饭没赶上点。','bad'); favor('boss',-8,'午餐超时');
+      S.residents.forEach(function(r){ r.needs.hunger=clamp(r.needs.hunger+22,0,100); });
+    }
+    S.residents.forEach(function(r){
+      if(!r.medDone && S.slot===r.medWin[1]+1){
+        incident(r.name+'的药过了给药时间窗');
+        r.medDone = true;
+      }
+    });
+  }
+  S.haze = S.energy < 35;
+  document.body.classList.toggle('hazy', S.haze);
+  if(S.slot>=SLOTS && !S.over){ S.over=true; }
+}
+
+/* ============ 动作 ============ */
+function A(id,room,title,desc,slots,eng,avail,run,prio){
+  return {id:id,room:room,title:title,desc:desc,slots:slots,eng:eng,avail:avail,run:run,prio:prio};
+}
+function needBar(r,k){ return r.needs[k]; }
+
+function buildActions(){
+  var L=[], d=R('danny'), ro=R('rosa'), here=S.here;
+
+  /* —— 客厅 —— */
+  L.push(A('chart','living','写记录本','把做过的事补进 charting binder（一次最多 3 条）',1,4,
+    function(){ return S.pending.length>0 ? true : '没有待记录的事'; },
+    function(){
+      var n = Math.min(3, S.pending.length);
+      for(var i=0;i<n;i++){ var p=S.pending.shift(); S.written++; say('已记录：'+p.x,'good'); }
+      if(S.pending.length===0) favor('boss',3,'记录本是干净的');
+    }, function(){ return S.pending.length>=5; }));
+
+  L.push(A('rest','living','坐下喘口气','关掉脑子两分钟。同事看见了会记在心里。',2,-18,
+    function(){ return S.rested<3 ? true : '今天已经坐够了'; },
+    function(){ S.rested++; if(S.rested>=3) favor('co',-5,'你老坐着'); say('你坐了十分钟。','note'); }));
+
+  L.push(A('tidyLiving','living','收拾客厅','抹布、垃圾桶、把遥控器从沙发缝里抠出来',2,7,
+    function(){ return S.rooms.living.clean<85 ? true : '已经很干净了'; },
+    function(){ S.rooms.living.clean=clamp(S.rooms.living.clean+35,0,100); }));
+
+  S.residents.forEach(function(r){
+    if(r.at==='living') L.push(A('comfort_'+r.id,'living','陪 '+r.name+' 坐一会儿','听他说话，把电视换到他要的台',2,6,
+      function(){ return r.needs.mood>20 ? true : r.name+'现在挺好'; },
+      function(){ r.needs.mood=clamp(r.needs.mood-55,0,100); chart(r.name+'：情绪支持，无异常行为');
+        if(r.id==='rosa') favor('co',2,'罗莎心情好，晚班省事'); },
+      function(){ return r.needs.mood>70; }));
+  });
+
+  L.push(A('handoff','living','写交班笔记','告诉晚班：谁拉了、谁没拉、洗衣机里还有东西',2,5,
+    function(){ return S.slot>=26 ? true : '还早，两点半以后再写'; },
+    function(){
+      var honest = S.pending.length<=2;
+      if(honest){ favor('co',16,'交班笔记写得清楚'); }
+      else { favor('co',6,'笔记写了，但有些事你自己也说不清'); }
+      S.handoffDone=true;
+    }, function(){ return S.slot>=28; }));
+
+  /* —— 厨房 —— */
+  L.push(A('menu','kitchen','看今日菜单','冰箱上那张塑封表，写着谁不能吃什么',1,2,
+    function(){ return !S.kitchen.menuRead ? true : '已经看过这一餐的菜单'; },
+    function(){ S.kitchen.menuRead=true; say('菜单：今日主食软食；丹尼无糖、罗莎切碎。','note'); }));
+
+  L.push(A('prep','kitchen','备菜','洗切配，按限制单分盘',3,9,
+    function(){ return !S.kitchen.prepped ? true : '菜已经备好了'; },
+    function(){ S.kitchen.prepped=true; }));
+
+  L.push(A('serve','kitchen','开饭','端上桌，看着他们吃完',2,7,
+    function(){
+      if(!S.kitchen.prepped) return '还没备菜';
+      if(!S.kitchen.breakfast) return true;
+      if(S.kitchen.lunch) return '今天两顿都开过了';
+      return S.slot>=LUNCH_FROM ? true : '午饭还太早（11:00 以后）';
+    },
+    function(){
+      var meal = S.kitchen.breakfast ? '午饭' : '早饭';
+      if(!S.kitchen.menuRead && Math.random()<0.55){
+        incident('给丹尼上了含糖果汁——没核对饮食限制单');
+      }
+      S.residents.forEach(function(r){
+        r.needs.hunger=clamp(r.needs.hunger-70,0,100);
+        chart(r.name+'：'+meal+'进食良好，按限制单供餐');
+      });
+      if(S.kitchen.breakfast) S.kitchen.lunch=true; else S.kitchen.breakfast=true;
+      S.kitchen.prepped=false; S.kitchen.menuRead=false; S.kitchen.dishes+=2;
+      favor('boss',4,meal+'准点');
+    }, function(){ return (!S.kitchen.breakfast && S.slot>=6) || (S.kitchen.breakfast && !S.kitchen.lunch && S.slot>=20); }));
+
+  L.push(A('dishes','kitchen','洗碗','水槽里那摞，留给晚班就是结仇',2,6,
+    function(){ return S.kitchen.dishes>0 ? true : '水槽是空的'; },
+    function(){ S.kitchen.dishes=0; favor('co',6,'水槽是空的'); }));
+
+  L.push(A('coffee','kitchen','倒杯咖啡','壶底那点，早就不烫了',1,0,
+    function(){ return S.kitchen.coffee<3 ? true : '再喝手要抖了'; },
+    function(){
+      S.kitchen.coffee++;
+      var gain = S.kitchen.coffee===1?26:(S.kitchen.coffee===2?16:6);
+      S.energy=clamp(S.energy+gain,0,100);
+      if(S.kitchen.coffee>=3) say('心跳有点快，但还是困。','note');
+    }));
+
+  S.residents.forEach(function(r){
+    L.push(A('med_'+r.id,'kitchen','给 '+r.name+' 发药','打开药柜，对姓名、对剂量、看着他咽下去',1,3,
+      function(){
+        if(r.medDone) return '今天的药发过了';
+        if(S.slot < r.medWin[0]) return '还没到给药窗口（'+clock(r.medWin[0])+'）';
+        if(S.slot > r.medWin[1]) return '已经错过窗口';
+        return true;
+      },
+      function(){ r.medDone=true; chart(r.name+'：按医嘱给药，'+clock(S.slot)+'，本人服下'); favor('boss',6,'给药准时'); },
+      function(){ return !r.medDone && S.slot>=r.medWin[0] && S.slot>r.medWin[1]-4; }));
+  });
+
+  L.push(A('wipeKitchen','kitchen','擦台面','',1,4,
+    function(){ return S.rooms.kitchen.clean<85 ? true : '已经很干净了'; },
+    function(){ S.rooms.kitchen.clean=clamp(S.rooms.kitchen.clean+30,0,100); }));
+
+  /* —— 卫生间 —— */
+  S.residents.forEach(function(r){
+    L.push(A('toilet_'+r.id,'bath','协助 '+r.name+' 如厕','把人带过来、搀扶、清洁、扶回去',2,7,
+      function(){ return r.needs.toilet>18 ? true : r.name+'刚去过'; },
+      function(){
+        r.needs.toilet=clamp(r.needs.toilet-85,0,100);
+        r.at='bath';
+        var chance = 0.28 + r.bmDays*0.16;
+        if(Math.random()<chance){
+          var type = 3 + Math.floor(Math.random()*3);
+          r.bmDays = 0;
+          chart('BM · '+r.name+' · '+clock(S.slot)+' · Bristol Type '+type+' · 协助下完成');
+          say(r.name+'排便了（Bristol '+type+'）——这条一定要记。','note');
+        } else {
+          chart(r.name+'：协助如厕，仅小便');
+        }
+      }, function(){ return r.needs.toilet>72; }));
+
+    L.push(A('shower_'+r.id,'bath','协助 '+r.name+' 洗澡','水温、防滑垫、全程不能离开',4,13,
+      function(){ return r.needs.hygiene>45 ? true : r.name+'今天不用洗'; },
+      function(){
+        r.needs.hygiene=clamp(r.needs.hygiene-80,0,100);
+        r.needs.mood=clamp(r.needs.mood-20,0,100);
+        r.at='bath'; S.laundry.dirty+=2;
+        chart(r.name+'：协助淋浴，皮肤检查无破损');
+      }));
+  });
+
+  L.push(A('cleanBath','bath','打扫卫生间','地面积水是最常见的跌倒原因',2,8,
+    function(){ return S.rooms.bath.clean<85 ? true : '已经很干净了'; },
+    function(){ S.rooms.bath.clean=clamp(S.rooms.bath.clean+40,0,100); }));
+
+  L.push(A('washStart','bath','开洗衣机','30 分钟后能转烘干',1,3,
+    function(){
+      if(S.laundry.state!=='idle') return '机器里还有东西';
+      return S.laundry.collected>0 ? true : '得先去卧室收脏衣服';
+    },
+    function(){ S.laundry.state='washing'; S.laundry.readyAt=S.slot+2; S.laundry.collected=0; }));
+
+  L.push(A('dryStart','bath','转到烘干机','45 分钟',1,2,
+    function(){ return S.laundry.state==='washed' ? true : '现在没有洗好的衣服'; },
+    function(){ S.laundry.state='drying'; S.laundry.readyAt=S.slot+3; }));
+
+  /* —— 卧室 —— */
+  ['bed1','bed2'].forEach(function(bid){
+    var r = S.residents.filter(function(x){return x.room===bid;})[0];
+    L.push(A('wake_'+r.id,bid,'协助 '+r.name+' 起床更衣','扶起、换衣、穿鞋',2,8,
+      function(){ return !r.up ? true : r.name+'已经起来了'; },
+      function(){ r.up=true; r.at='living'; chart(r.name+'：晨间协助起床、更衣，配合度良好');
+        r.needs.mood=clamp(r.needs.mood-15,0,100); }, function(){ return !r.up && S.slot<8; }));
+
+    L.push(A('bedmake_'+bid,bid,'整理床铺','',1,4,
+      function(){ return S.rooms[bid].clean<85 ? true : '已经很整齐了'; },
+      function(){ S.rooms[bid].clean=clamp(S.rooms[bid].clean+30,0,100); }));
+
+    L.push(A('collect_'+bid,bid,'收脏衣服','床脚那一堆',1,3,
+      function(){ return S.laundry.dirty>0 ? true : '没有要洗的'; },
+      function(){ S.laundry.collected+=S.laundry.dirty; S.laundry.dirty=0; }));
+
+    L.push(A('fold_'+bid,bid,'叠衣服归位','',2,5,
+      function(){ return S.laundry.state==='dried' ? true : '烘干机里还没东西'; },
+      function(){ S.laundry.state='idle'; favor('co',5,'衣服叠好归位了'); }));
+  });
+
+  return L.filter(function(a){ return a.room===here; });
+}
+
+/* ============ 随机事件 ============ */
+var EVENTS = [
+  {id:'remote', when:function(){return R('danny').at==='living';}, title:'遥控器不见了',
+   text:'丹尼把遥控器扔到了沙发后面，现在冲着电视喊。他不会告诉你他扔了。',
+   ch:[
+    {t:'蹲下去把它抠出来', d:'−1 格 · 精力 −5 · 丹尼平静', f:function(){ advance(1); S.energy-=5; R('danny').needs.mood=10; chart('丹尼：行为激动，重定向后平复'); }},
+    {t:'先忙完手上的事', d:'情绪继续涨，可能升级', f:function(){ R('danny').needs.mood=clamp(R('danny').needs.mood+30,0,100); }}
+   ]},
+  {id:'keisha', when:function(){return true;}, title:'凯莎发消息',
+   text:'「能帮我顶十五分钟吗？我得给我儿子学校回个电话。」',
+   ch:[
+    {t:'顶', d:'−1 格 · 精力 −7 · 凯莎 +14', f:function(){ advance(1); S.energy-=7; favor('co',14,'你替她顶了班'); }},
+    {t:'今天真的不行', d:'凯莎 −9', f:function(){ favor('co',-9,'你没接她的班'); }}
+   ]},
+  {id:'boss_call', when:function(){return true;}, title:'琳达打电话进来',
+   text:'「昨天的 BM chart 有一栏是空的。你们那班是没人拉屎，还是没人写？」',
+   ch:[
+    {t:'承认漏记了', d:'琳达 −4，但她记住了你说实话', f:function(){ favor('boss',-4,'你承认漏记'); S.honest=true; }},
+    {t:'说今天一定补齐', d:'下班时若还有待记录 → 琳达 −16', f:function(){ S.promised=true; say('你答应琳达今天记录不留尾巴。','note'); }}
+   ]},
+  {id:'rosa_belly', when:function(){return R('rosa').bmDays>=2;}, title:'罗莎说肚子胀',
+   text:'「我肚子不舒服。」她已经两天没有排便记录了。',
+   ch:[
+    {t:'记录并上报护士', d:'−1 格 · 琳达 +10', f:function(){ advance(1); chart('罗莎：主诉腹胀，已上报护士，BM 已 '+R('rosa').bmDays+' 天'); favor('boss',10,'便秘按流程上报'); }},
+    {t:'先给她拿杯水', d:'省时间，但没有记录', f:function(){ R('rosa').needs.mood=clamp(R('rosa').needs.mood-10,0,100); }}
+   ]},
+  {id:'puddle', when:function(){return true;}, title:'卫生间地上有一摊水',
+   text:'从门口就看得见反光。罗莎一会儿要过去。',
+   ch:[
+    {t:'马上拖干净', d:'−1 格 · 精力 −4', f:function(){ advance(1); S.energy-=4; S.rooms.bath.clean=clamp(S.rooms.bath.clean+20,0,100); }},
+    {t:'等下一起打扫', d:'有几率发生跌倒', f:function(){ if(Math.random()<0.45){ incident('罗莎在卫生间滑倒，需填 incident report 并通知家属'); } }}
+   ]},
+  {id:'family', when:function(){return true;}, title:'家属来访',
+   text:'丹尼的姐姐站在门口：「他今天中午吃的什么？血糖测了吗？」',
+   ch:[
+    {t:'翻记录本，照着念', d:'需要记录本干净 · 琳达 +8 / −8', f:function(){
+        if(S.written>=4){ favor('boss',8,'家属问话时你答得上来'); } else { favor('boss',-8,'家属问话你答不上来'); } }},
+    {t:'凭印象随口答', d:'琳达 −12 的风险', f:function(){ if(Math.random()<0.6) favor('boss',-12,'你说的和记录对不上'); }}
+   ]},
+  {id:'machine', when:function(){return S.laundry.state==='washing';}, title:'洗衣机报 E4',
+   text:'滚筒停在半路，门锁着，里面是罗莎的床单。',
+   ch:[
+    {t:'断电重启', d:'−1 格', f:function(){ advance(1); S.laundry.readyAt=S.slot+2; }},
+    {t:'留给晚班处理', d:'凯莎 −10', f:function(){ favor('co',-10,'你把坏机器留给了晚班'); }}
+   ]}
+];
+function maybeEvent(){
+  if(S.over) return false;
+  if(S.evtCooldown>0){ S.evtCooldown--; return false; }
+  if(S.slot<3 || S.slot>29) return false;
+  if(Math.random()>0.34) return false;
+  var pool = EVENTS.filter(function(e){ return S.events.indexOf(e.id)<0 && e.when(); });
+  if(!pool.length) return false;
+  var e = pool[Math.floor(Math.random()*pool.length)];
+  S.events.push(e.id); S.evtCooldown=3;
+  showEvent(e);
+  return true;
+}
+
+/* ============ 执行动作 ============ */
+function perform(list, idx){
+  if(S.over) return;
+  var a = list[idx];
+  if(S.haze && Math.random()<0.16){
+    var alts = list.map(function(x,i){return i;}).filter(function(i){ return i!==idx && list[i].avail()===true; });
+    if(alts.length){
+      var pick = alts[Math.floor(Math.random()*alts.length)];
+      a = list[pick];
+      toast('……你走神了，手点到了别的地方：'+a.title);
+      say('恍惚：本想做别的，结果去了「'+a.title+'」','bad');
+    }
+  }
+  if(a.avail()!==true) return;
+  var slots = a.slots;
+  if(S.haze && Math.random()<0.28){ slots++; toast('动作比平时慢了一格。'); }
+  S.energy = clamp(S.energy - a.eng, 0, 100);
+  a.run();
+  say(a.title, '');
+  advance(slots);
+  render();
+  if(!S.over) maybeEvent();
+  if(S.over) endDay();
+}
+
+/* ============ 渲染 ============ */
+function render(){
+  $('dayLbl').textContent = '第 '+S.day+' 天 · '+DAYNAMES[S.day-1];
+  $('clock').textContent = clock(Math.min(S.slot,SLOTS));
+  $('engV').textContent = Math.round(S.energy);
+  var ef=$('engF'); ef.style.width=S.energy+'%';
+  ef.className='fill'+(S.energy<35?' bad':(S.energy<60?' warn':''));
+  $('wageV').textContent = '$'+S.wage.toFixed(2);
+  var total = S.written + S.pending.length;
+  $('docF').style.width = (total? (S.written/total*100):0)+'%';
+  $('hazebar').hidden = !S.haze;
+
+  var tk=''; for(var i=0;i<SLOTS;i++){
+    var c='tick'+(i<S.slot?' past':'')+(i===S.slot?' now':'');
+    if(i===BREAKFAST_BY||i===LUNCH_BY) c+=' meal';
+    tk+='<div class="'+c+'"></div>';
+  }
+  $('ticks').innerHTML=tk;
+
+  // floor plan
+  var plan='';
+  ROOMS.forEach(function(rm){
+    var people = S.residents.filter(function(r){return r.at===rm.id;});
+    var flags=[];
+    var clean=S.rooms[rm.id].clean;
+    if(clean<40) flags.push('<span class="flag red">脏</span>');
+    else if(clean<65) flags.push('<span class="flag amber">该擦了</span>');
+    if(rm.id==='kitchen'){
+      if(S.kitchen.dishes>0) flags.push('<span class="flag amber">水槽</span>');
+      S.residents.forEach(function(r){ if(!r.medDone && S.slot>=r.medWin[0]&&S.slot<=r.medWin[1]) flags.push('<span class="flag red">'+r.name+'的药</span>'); });
+      if(!S.kitchen.breakfast) flags.push('<span class="flag blue">早饭</span>');
+      else if(!S.kitchen.lunch && S.slot>=LUNCH_FROM) flags.push('<span class="flag blue">午饭</span>');
+    }
+    if(rm.id==='bath'){
+      if(S.laundry.state==='washed') flags.push('<span class="flag blue">该烘了</span>');
+      if(S.laundry.state==='dried') flags.push('<span class="flag blue">该叠了</span>');
+    }
+    if(rm.id==='living' && S.pending.length>=5) flags.push('<span class="flag red">'+S.pending.length+' 条待记</span>');
+    plan += '<button class="room '+rm.cls+'" data-room="'+rm.id+'" aria-pressed="'+(S.here===rm.id)+'">'
+      + '<div class="rname">'+rm.en+'</div><div class="rcn">'+rm.cn+'</div>'
+      + '<div class="flags">'+flags.join('')+'</div>'
+      + '<div class="people">'+people.map(function(r){
+          var urgent = r.needs.toilet>72 || r.needs.mood>72;
+          return '<span class="chip'+(urgent?' urgent':'')+'" title="'+r.name+'">'+r.init+'</span>';
+        }).join('')+'</div></button>';
+  });
+  $('plan').innerHTML=plan;
+  Array.prototype.forEach.call(document.querySelectorAll('.room'), function(b){
+    b.addEventListener('click', function(){ S.here=b.dataset.room; render(); });
+  });
+
+  // actions
+  var list = buildActions();
+  var rmObj = ROOMS.filter(function(r){return r.id===S.here;})[0];
+  $('actHead').textContent = rmObj.cn+' · 可做的事';
+  $('actSub').textContent = '剩 '+(SLOTS-S.slot)+' 格 / '+clock(SLOTS);
+  var html='';
+  list.forEach(function(a,i){
+    var av = a.avail(), ok = av===true;
+    var prio = ok && a.prio && a.prio();
+    var cost = (a.eng<0? '精力 +'+(-a.eng) : '精力 −'+a.eng);
+    html += '<button class="act'+(prio?' prio':'')+'" data-i="'+i+'"'+(ok?'':' disabled')+'>'
+      + '<span><span class="t">'+a.title+'</span>'
+      + '<span class="d">'+(ok ? (a.desc||'') : av)+'</span></span>'
+      + '<span class="cost"><b>'+a.slots+' 格</b> · '+cost+'</span></button>';
+  });
+  $('acts').innerHTML = html;
+  Array.prototype.forEach.call(document.querySelectorAll('.act'), function(b){
+    b.addEventListener('click', function(){ perform(list, +b.dataset.i); });
+  });
+
+  // residents
+  var rh='';
+  var NEEDLBL={toilet:'如厕',hunger:'饥饿',mood:'情绪',hygiene:'清洁'};
+  S.residents.forEach(function(r){
+    var needs='';
+    ['toilet','hunger','mood','hygiene'].forEach(function(k){
+      var v=r.needs[k], cls = v>75?'nf b':(v>50?'nf w':'nf');
+      needs += '<div class="need"><div class="nl">'+NEEDLBL[k]+'</div><div class="nb"><div class="'+cls+'" style="width:'+v+'%"></div></div></div>';
+    });
+    var due = r.bmDays>=3;
+    rh += '<div class="res"><div class="hd"><span class="nm">'+r.name+'</span>'
+      + '<span class="sub">'+(r.medDone?'药 ✓':'药 '+clock(r.medWin[0])+'–'+clock(r.medWin[1]))+'</span></div>'
+      + '<div class="sub">'+r.sub+'</div>'
+      + '<div class="needs">'+needs+'</div>'
+      + '<div class="bmline"><span>BM chart</span><span class="pill'+(due?' due':'')+'">'+r.bmDays+' 天未排便</span>'
+      + (due?'<span style="color:var(--red)">需上报</span>':'')+'</div></div>';
+  });
+  $('residents').innerHTML=rh;
+
+  // favors
+  function favBlock(nm, role, v, why){
+    var cls = v>=65?'fill good':(v<35?'fill bad':'fill');
+    return '<div class="fav"><div class="top"><span class="nm">'+nm+'</span><span class="num" style="font-size:12px">'+Math.round(v)+'</span></div>'
+      + '<div class="role">'+role+'</div><div class="bar"><div class="'+cls+'" style="width:'+v+'%"></div></div>'
+      + '<div class="why">'+why+'</div></div>';
+  }
+  $('favors').innerHTML =
+    favBlock('凯莎','同班同事', S.favorCo, '看你留没留活儿给她') +
+    favBlock('琳达','House Manager', S.favorBoss, '只看得见记录和事件报告');
+
+  // pending
+  $('pendCount').textContent = S.pending.length+' 条';
+  if(!S.pending.length){ $('pending').innerHTML='<div class="empty">目前没有欠下的记录。做过的事只要没写进去，在琳达眼里就没发生过。</div>'; }
+  else {
+    $('pending').innerHTML = S.pending.map(function(p){
+      return '<div class="row"><span class="tm">'+p.t+'</span><span>'+p.x+'</span></div>';
+    }).join('');
+  }
+
+  // log
+  $('log').innerHTML = S.log.slice(-40).map(function(l){
+    return '<div class="l '+l.k+'"><span class="tm">'+l.t+'</span><span>'+l.x+'</span></div>';
+  }).join('');
+  $('log').scrollTop = 99999;
+}
+
+/* ============ 弹窗 ============ */
+function modal(html){
+  $('modalHost').innerHTML = '<div class="scrim"><div class="modal" role="dialog" aria-modal="true">'+html+'</div></div>';
+}
+function closeModal(){ $('modalHost').innerHTML=''; }
+
+function showEvent(e){
+  var ch = e.ch.map(function(c,i){
+    return '<button class="choice" data-c="'+i+'"><div class="ct">'+c.t+'</div><div class="cd">'+c.d+'</div></button>';
+  }).join('');
+  modal('<div class="mh"><span class="k">打断 · '+clock(S.slot)+'</span><span class="k">'+(SLOTS-S.slot)+' 格剩余</span></div>'
+    + '<div class="mb"><h3>'+e.title+'</h3><p>'+e.text+'</p><div class="choices">'+ch+'</div></div>');
+  Array.prototype.forEach.call(document.querySelectorAll('.choice'), function(b){
+    b.addEventListener('click', function(){
+      closeModal(); say('【'+e.title+'】'+e.ch[+b.dataset.c].t,'note');
+      e.ch[+b.dataset.c].f(); S.energy=clamp(S.energy,0,100);
+      render(); if(S.over) endDay();
+    });
+  });
+}
+
+/* ============ 日终结算 ============ */
+function endDay(){
+  // 结算前的最后检查
+  if(!S.handoffDone){ favor('co',-14,'你没写交班笔记'); }
+  if(S.promised && S.pending.length>0){ favor('boss',-16,'你答应琳达补齐记录，没做到'); }
+  S.residents.forEach(function(r){
+    r.bmDays = (r.bmDays===0) ? 0 : r.bmDays+1;
+    if(r.bmDays===0) r.bmDays=1; // 明天起算
+    if(!r.medDone) {}
+  });
+  var totalCare = S.written + S.pending.length;
+  var docRate = totalCare ? S.written/totalCare : 1;
+  var avgNeed = 0, n=0;
+  S.residents.forEach(function(r){ ['toilet','hunger','mood','hygiene'].forEach(function(k){ avgNeed+=r.needs[k]; n++; }); });
+  avgNeed/=n;
+  var cleanAvg = (S.rooms.living.clean+S.rooms.kitchen.clean+S.rooms.bath.clean+S.rooms.bed1.clean+S.rooms.bed2.clean)/5;
+
+  var score = 0;
+  score += docRate*34;
+  score += Math.max(0, 22 - S.incidents*11);
+  score += (S.favorBoss/100)*16;
+  score += (S.favorCo/100)*12;
+  score += Math.max(0,(100-avgNeed))/100*10;
+  score += cleanAvg/100*6;
+  var grade = score>=82?'A':score>=68?'B':score>=52?'C':'D';
+
+  S.weekly.days.push({day:S.day, score:score, grade:grade, doc:docRate, inc:S.incidents});
+
+  var rows = [
+    ['记录完整度', Math.round(docRate*100)+'%　('+S.written+'/'+totalCare+')'],
+    ['事件报告', S.incidents+' 起'],
+    ['居民平均需求（越低越好）', Math.round(avgNeed)],
+    ['房子整洁度', Math.round(cleanAvg)],
+    ['凯莎 / 琳达', Math.round(S.favorCo)+' / '+Math.round(S.favorBoss)],
+    ['下班剩余精力', Math.round(S.energy)]
+  ].map(function(r){ return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td></tr>'; }).join('');
+
+  var verdict = {
+    A:'琳达在群里@了你一句「今天这班记录很干净」。',
+    B:'没人找你麻烦。这在这行已经算不错了。',
+    C:'交班时凯莎看了你一眼，什么也没说。',
+    D:'你回到车里坐了十分钟才想起来发动。'
+  }[grade];
+
+  var isLast = S.day>=5;
+  modal('<div class="mh"><span class="k">下班打卡 · 15:00</span><span class="k">第 '+S.day+' 天</span></div>'
+    + '<div class="mb"><div style="display:flex;gap:18px;align-items:flex-start">'
+    + '<div><div class="grade" style="color:'+(grade==='D'?'var(--red)':grade==='A'?'var(--green)':'var(--ink)')+'">'+grade+'</div>'
+    + '<div class="lbl" style="margin-top:4px">日评</div></div>'
+    + '<div style="flex:1"><h3 style="margin-top:0">'+verdict+'</h3>'
+    + '<table class="scoretable">'+rows+'</table></div></div>'
+    + '<div style="display:flex;gap:8px"><button class="btn" id="nextBtn">'+(isLast?'看周结算':'打卡上班 · 第 '+(S.day+1)+' 天')+'</button></div></div>');
+
+  $('nextBtn').addEventListener('click', function(){
+    closeModal();
+    if(isLast){ weekEnd(); return; }
+    var carry = {
+      energy: clamp(58 + S.energy*0.42 - S.incidents*5, 30, 100),
+      wage:S.wage, favorCo:S.favorCo, favorBoss:S.favorBoss, weekly:S.weekly,
+      bm:{danny:R('danny').bmDays, rosa:R('rosa').bmDays}
+    };
+    S = newDay(S.day+1, carry);
+    say('打卡上班。','note');
+    render();
+  });
+}
+
+function weekEnd(){
+  var avg = S.weekly.days.reduce(function(a,b){return a+b.score;},0)/S.weekly.days.length;
+  var inc = S.weekly.days.reduce(function(a,b){return a+b.inc;},0);
+  var doc = S.weekly.days.reduce(function(a,b){return a+b.doc;},0)/S.weekly.days.length;
+  var raise = (avg>=70 && inc<=3 && S.favorBoss>=55);
+  var newWage = raise ? S.wage+1.25 : S.wage;
+  var rows = S.weekly.days.map(function(d){
+    return '<tr><td>'+DAYNAMES[d.day-1]+'</td><td>'+d.grade+'　记录 '+Math.round(d.doc*100)+'%　事件 '+d.inc+'</td></tr>';
+  }).join('');
+  modal('<div class="mh"><span class="k">90 天试用期 · 第一周复核</span><span class="k">Linda M., House Manager</span></div>'
+    + '<div class="mb"><h3>'+(raise?'转正加薪：$'+S.wage.toFixed(2)+' → $'+newWage.toFixed(2)+'/小时'
+        :'试用期延长。时薪维持 $'+S.wage.toFixed(2)+'。')+'</h3>'
+    + '<p>'+(raise
+        ? '「记录能查、事件不多、晚班没抱怨。下周开始你带新人。」'
+        : '「不是说你不用心。是我只能看见纸上写了什么。」')+'</p>'
+    + '<table class="scoretable">'+rows
+    + '<tr><td>周均记录完整度</td><td>'+Math.round(doc*100)+'%</td></tr>'
+    + '<tr><td>本周事件总数</td><td>'+inc+'</td></tr></table>'
+    + '<div style="display:flex;gap:8px"><button class="btn" id="againBtn">再干一周</button></div></div>');
+  $('againBtn').addEventListener('click', function(){
+    closeModal();
+    S = newDay(1, {energy:100, wage:newWage, favorCo:S.favorCo, favorBoss:S.favorBoss,
+                   weekly:{days:[]}, bm:{danny:1,rosa:2}});
+    render();
+  });
+}
+
+/* ============ 开场 ============ */
+function intro(){
+  modal('<div class="mh"><span class="k">上岗通知单</span><span class="k">Direct Support Professional</span></div>'
+    + '<div class="mb"><h3>第一天，白班 7:00–15:00</h3>'
+    + '<p>两位居民，五个房间，八小时切成 32 个格子。活永远比格子多——这是设计，不是失误。你要决定的是谁可以等。</p>'
+    + '<p><b>三条规矩：</b><br>'
+    + '① <b>做了不等于记了。</b>琳达看不见你做的事，只看得见记录本。<br>'
+    + '② <b>凯莎看的是你留没留活儿给她。</b>她和琳达的标准不一样，有时候冲突。<br>'
+    + '③ <b>精力低于 35 会开始恍惚。</b>点动作可能点错、耗时会变多。咖啡和坐下都能救，但都要花格子。</p>'
+    + '<div style="display:flex;gap:8px"><button class="btn" id="startBtn">打卡上班</button></div></div>');
+  $('startBtn').addEventListener('click', function(){ closeModal(); });
+}
+
+/* ============ 启动 ============ */
+function start(data){
+  if(data && data.S){ try{ S = data.S; }catch(e){ S = newDay(1,null); } }
+  else { S = newDay(1,null); say('打卡上班。','note'); }
+  render();
+  if(!data || !data.S) intro();
+}
+if(window.claude && window.claude.hot){
+  try{ window.claude.hot.snapshot(function(){ return {S:S}; }); }catch(e){}
+}
+if(window.claude && window.claude.hot && window.claude.hot.ready){ window.claude.hot.ready(start); }
+else { start((window.claude && window.claude.hot && window.claude.hot.data) || {}); }
+})();
+</script>
